@@ -1,0 +1,51 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Allows you to manually trigger the build from the Actions tab
+
+jobs:
+  build:
+    name: Build & Export APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17' # Required for newer Android Gradle Plugins
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true # Speeds up consecutive builds by caching flutter SDK
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # NOTE: If you haven't committed the google-services.json file to GitHub for security reasons, 
+      # uncomment the lines below and add the base64 string to GitHub Secrets as GOOGLE_SERVICES_JSON.
+      # - name: Setup Firebase Config (google-services.json)
+      #   run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > android/app/google-services.json
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Upload APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zuumeet-Release-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14 # The APK will be available for download for 14 days
