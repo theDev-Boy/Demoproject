@@ -33,6 +33,9 @@ class _AuthScreenState extends State<AuthScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      setState(() {});
+    });
   }
 
   @override
@@ -74,13 +77,7 @@ class _AuthScreenState extends State<AuthScreen>
     }
   }
 
-  void _onGoogleSignIn() async {
-    final auth = context.read<AuthProvider>();
-    final success = await auth.signInWithGoogle();
-    if (!success && mounted) {
-      _showError(auth.error ?? 'Google Sign-In failed');
-    }
-  }
+
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -247,45 +244,6 @@ class _AuthScreenState extends State<AuthScreen>
                               _buildLoginForm(),
                               _buildSignUpForm(),
                             ],
-                          ),
-                        ),
-
-                        // OR Divider
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          child: Row(
-                            children: [
-                              const Expanded(child: Divider()),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Text('OR', style: AppTypography.caption.copyWith(fontSize: 13)),
-                              ),
-                              const Expanded(child: Divider()),
-                            ],
-                          ),
-                        ),
-
-                        // GOOGLE BUTTON — LARGE
-                        SizedBox(
-                          height: 56,
-                          child: OutlinedButton.icon(
-                            onPressed: _onGoogleSignIn,
-                            icon: Image.network(
-                              'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                              width: 22,
-                              height: 22,
-                              errorBuilder: (_, e, s) => const Icon(Icons.g_mobiledata, size: 26),
-                            ),
-                            label: Text(
-                              'Continue with Google',
-                              style: AppTypography.button.copyWith(fontSize: 16, color: isDark ? Colors.white : AppColors.textPrimary),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: isDark ? Colors.white24 : AppColors.border, width: 1.5),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppDimensions.radiusL),
-                              ),
-                            ),
                           ),
                         ),
 

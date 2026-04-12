@@ -36,15 +36,20 @@ class WebRTCService {
 
   /// Media constraints for getUserMedia.
   final Map<String, dynamic> _mediaConstraints = {
-    'audio': true,
+    'audio': {
+      'echoCancellation': true,
+      'noiseSuppression': true,
+      'autoGainControl': true,
+    },
     'video': {
       'mandatory': {
-        'minWidth': '640',
-        'minHeight': '480',
-        'minFrameRate': '30',
+        'minWidth': '320', // Ensures it works on older phones but can scale up
+        'minHeight': '240',
       },
+      'optional': [
+        {'frameRate': 30}, // Tries for 30fps if device can handle it, otherwise scales down naturally
+      ],
       'facingMode': 'user',
-      'optional': [],
     },
   };
 

@@ -219,9 +219,9 @@ class AuthProvider extends ChangeNotifier {
   // PROFILE UPDATE
   // ---------------------------------------------------------------------------
 
-  Future<void> updateGenderAndInterests({
+  Future<void> updateProfile({
     required String gender,
-    required List<String> interestedIn,
+    required String age,
     required String country,
     required String countryCode,
   }) async {
@@ -230,13 +230,13 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _databaseService.updateUser(_firebaseUser!.uid, {
         'gender': gender,
-        'interestedIn': interestedIn,
+        'age': age,
         'country': country,
         'countryCode': countryCode,
       });
       _userModel = _userModel!.copyWith(
         gender: gender,
-        interestedIn: interestedIn,
+        age: age,
         country: country,
         countryCode: countryCode,
       );

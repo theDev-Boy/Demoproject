@@ -17,7 +17,7 @@ class GenderSelectionScreen extends StatefulWidget {
 
 class _GenderSelectionScreenState extends State<GenderSelectionScreen> {
   String _selectedGender = 'Male';
-  final List<String> _interestedIn = ['Women'];
+  final _ageCtrl = TextEditingController();
   String _country = 'Unknown';
   String _countryCode = '';
 
@@ -25,6 +25,12 @@ class _GenderSelectionScreenState extends State<GenderSelectionScreen> {
   void initState() {
     super.initState();
     _detectLocation();
+  }
+
+  @override
+  void dispose() {
+    _ageCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _detectLocation() async {
@@ -35,22 +41,20 @@ class _GenderSelectionScreenState extends State<GenderSelectionScreen> {
     });
   }
 
-  void _onToggleInterest(String interest) {
-    setState(() {
-      if (_interestedIn.contains(interest)) {
-        if (_interestedIn.length > 1) {
-          _interestedIn.remove(interest);
-        }
-      } else {
-        _interestedIn.add(interest);
-      }
-    });
-  }
-
   void _onContinue() async {
-    await context.read<AuthProvider>().updateGenderAndInterests(
+    if (_ageCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter your age'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    await context.read<AuthProvider>().updateProfile(
       gender: _selectedGender,
-      interestedIn: _interestedIn,
+      age: _ageCtrl.text.trim(),
       country: _country,
       countryCode: _countryCode,
     );
@@ -65,7 +69,7 @@ class _GenderSelectionScreenState extends State<GenderSelectionScreen> {
         Scaffold(
           backgroundColor: AppColors.background,
           body: SafeArea(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -90,19 +94,26 @@ class _GenderSelectionScreenState extends State<GenderSelectionScreen> {
                     ],
                   ),
                   const SizedBox(height: 32),
-                  Text('Show me', style: AppTypography.headlineSmall),
+                  Text('Age', style: AppTypography.headlineSmall),
                   const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 12,
-                    children: [
-                      _buildInterestChip('Men'),
-                      _buildInterestChip('Women'),
-                      _buildInterestChip('Everyone'),
-                    ],
+                  TextField(
+                    controller: _ageCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: 'Enter your age',
+                      filled: true,
+                      fillColor: AppColors.backgroundSecondary,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 64),
                   CustomButton(
                     text: 'Continue',
+                    height: 56,
                     onPressed: _onContinue,
                   ),
                 ],
@@ -140,24 +151,6 @@ class _GenderSelectionScreenState extends State<GenderSelectionScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildInterestChip(String interest) {
-    final isSelected = _interestedIn.contains(interest);
-    return ChoiceChip(
-      label: Text(interest),
-      selected: isSelected,
-      onSelected: (_) => _onToggleInterest(interest),
-      selectedColor: AppColors.primary,
-      backgroundColor: AppColors.backgroundSecondary,
-      labelStyle: AppTypography.button.copyWith(
-        color: isSelected ? Colors.white : AppColors.textSecondary,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusM),
-        side: BorderSide.none,
       ),
     );
   }

@@ -1,33 +1,21 @@
 import 'dart:convert';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/logger.dart';
 
-/// Detects the user's country via GPS (primary) or IP geolocation (fallback).
+/// Detects the user's country via lightning-fast IP geolocation.
+/// We do not ask for exact GPS permission on sign-up to improve conversion rate.
 class LocationService {
   static const _countryKey = 'cached_country';
   static const _countryCodeKey = 'cached_country_code';
 
   /// Get the user's country. Returns a map with 'country' and 'countryCode'.
   Future<Map<String, String>> getCountry() async {
-    // Try cached first
+    // 1. Try cached first
     final cached = await _getCached();
     if (cached != null) return cached;
 
-    // Try GPS
-    try {
-      final gps = await _getFromGPS();
-      if (gps != null) {
-        await _cache(gps);
-        return gps;
-      }
-    } catch (e) {
-      logger.w('GPS country detection failed', error: e);
-    }
-
-    // Fallback: IP-based
+    // 2. Try IP Geolocation (Primary)
     try {
       final ip = await _getFromIP();
       if (ip != null) {
@@ -38,51 +26,34 @@ class LocationService {
       logger.w('IP country detection failed', error: e);
     }
 
-    return {'country': 'Unknown', 'countryCode': ''};
-  }
-
-  Future<Map<String, String>?> _getFromGPS() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return null;
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return null;
-    }
-    if (permission == LocationPermission.deniedForever) return null;
-
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.low,
-        timeLimit: Duration(seconds: 10),
-      ),
-    );
-
-    final placemarks = await placemarkFromCoordinates(
-      position.latitude,
-      position.longitude,
-    );
-
-    if (placemarks.isNotEmpty) {
-      return {
-        'country': placemarks.first.country ?? 'Unknown',
-        'countryCode': placemarks.first.isoCountryCode ?? '',
-      };
-    }
-    return null;
+    // Fallback if no network
+    return {'country': 'Unknown Location', 'countryCode': ''};
   }
 
   Future<Map<String, String>?> _getFromIP() async {
     try {
-      final response = await http
-          .get(Uri.parse('https://ipapi.co/json/'))
-          .timeout(const Duration(seconds: 5));
+      // First try ip-api
+      var response = await http
+          .get(Uri.parse('http://ip-api.com/json/?fields=country,countryCode'))
+          .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return {
-          'country': data['country_name'] as String? ?? 'Unknown',
+          'country': data['country'] as String? ?? 'Unknown Location',
+          'countryCode': data['countryCode'] as String? ?? '',
+        };
+      }
+
+      // Fallback to ipapi.co
+      response = await http
+          .get(Uri.parse('https://ipapi.co/json/'))
+          .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {
+          'country': data['country_name'] as String? ?? 'Unknown Location',
           'countryCode': data['country_code'] as String? ?? '',
         };
       }
@@ -101,6 +72,7 @@ class LocationService {
   }
 
   Future<void> _cache(Map<String, String> data) async {
+    if (data['countryCode'] == null || data['countryCode']!.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_countryKey, data['country']!);
     await prefs.setString(_countryCodeKey, data['countryCode']!);

@@ -7,7 +7,7 @@ class UserModel extends Equatable {
   final String email;
   final String? photoUrl;
   final String gender;
-  final List<String> interestedIn;
+  final String age;
   final String country;
   final String countryCode;
   final bool isOnline;
@@ -15,6 +15,8 @@ class UserModel extends Equatable {
   final int createdAt;
   final int lastActive;
   final List<String> blockedUsers;
+  final List<String> friends;
+  final List<String> friendRequests;
 
   const UserModel({
     required this.uid,
@@ -22,7 +24,7 @@ class UserModel extends Equatable {
     required this.email,
     this.photoUrl,
     this.gender = '',
-    this.interestedIn = const [],
+    this.age = '',
     this.country = '',
     this.countryCode = '',
     this.isOnline = false,
@@ -30,6 +32,8 @@ class UserModel extends Equatable {
     required this.createdAt,
     required this.lastActive,
     this.blockedUsers = const [],
+    this.friends = const [],
+    this.friendRequests = const [],
   });
 
   factory UserModel.fromJson(Map<dynamic, dynamic> json, String uid) {
@@ -39,10 +43,7 @@ class UserModel extends Equatable {
       email: json['email'] as String? ?? '',
       photoUrl: json['photoUrl'] as String?,
       gender: json['gender'] as String? ?? '',
-      interestedIn: (json['interestedIn'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
+      age: json['age'] as String? ?? '',
       country: json['country'] as String? ?? '',
       countryCode: json['countryCode'] as String? ?? '',
       isOnline: json['isOnline'] as bool? ?? false,
@@ -50,6 +51,14 @@ class UserModel extends Equatable {
       createdAt: json['createdAt'] as int? ?? 0,
       lastActive: json['lastActive'] as int? ?? 0,
       blockedUsers: (json['blockedUsers'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      friends: (json['friends'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      friendRequests: (json['friendRequests'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
@@ -63,7 +72,7 @@ class UserModel extends Equatable {
       'email': email,
       'photoUrl': photoUrl,
       'gender': gender,
-      'interestedIn': interestedIn,
+      'age': age,
       'country': country,
       'countryCode': countryCode,
       'isOnline': isOnline,
@@ -71,6 +80,8 @@ class UserModel extends Equatable {
       'createdAt': createdAt,
       'lastActive': lastActive,
       'blockedUsers': blockedUsers,
+      'friends': friends,
+      'friendRequests': friendRequests,
     };
   }
 
@@ -79,13 +90,15 @@ class UserModel extends Equatable {
     String? email,
     String? photoUrl,
     String? gender,
-    List<String>? interestedIn,
+    String? age,
     String? country,
     String? countryCode,
     bool? isOnline,
     bool? isSearching,
     int? lastActive,
     List<String>? blockedUsers,
+    List<String>? friends,
+    List<String>? friendRequests,
   }) {
     return UserModel(
       uid: uid,
@@ -93,7 +106,7 @@ class UserModel extends Equatable {
       email: email ?? this.email,
       photoUrl: photoUrl ?? this.photoUrl,
       gender: gender ?? this.gender,
-      interestedIn: interestedIn ?? this.interestedIn,
+      age: age ?? this.age,
       country: country ?? this.country,
       countryCode: countryCode ?? this.countryCode,
       isOnline: isOnline ?? this.isOnline,
@@ -101,6 +114,8 @@ class UserModel extends Equatable {
       createdAt: createdAt,
       lastActive: lastActive ?? this.lastActive,
       blockedUsers: blockedUsers ?? this.blockedUsers,
+      friends: friends ?? this.friends,
+      friendRequests: friendRequests ?? this.friendRequests,
     );
   }
 
@@ -125,5 +140,5 @@ class UserModel extends Equatable {
   }
 
   @override
-  List<Object?> get props => [uid, name, email, gender, country];
+  List<Object?> get props => [uid, name, email, gender, age, country];
 }

@@ -6,6 +6,7 @@ import '../config/app_colors.dart';
 import '../config/app_dimensions.dart';
 import '../providers/auth_provider.dart';
 import '../providers/call_provider.dart';
+import '../services/database_service.dart';
 import '../widgets/call_controls.dart';
 import '../widgets/searching_animation.dart';
 
@@ -109,6 +110,13 @@ class _CallScreenState extends State<CallScreen> {
                 ),
                 child: Row(
                   children: [
+                    // Minimize button
+                    IconButton(
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 30),
+                      tooltip: 'Minimize',
+                      onPressed: () => context.pop(),
+                    ),
+                    const SizedBox(width: 8),
                     // Timer
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -157,6 +165,38 @@ class _CallScreenState extends State<CallScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 12),
+                    // Add Friend button
+                    if (call.currentMatch != null)
+                      IconButton(
+                        icon: const Icon(Icons.person_add_rounded, color: Colors.white),
+                        tooltip: 'Add Friend',
+                        onPressed: () async {
+                          final partnerUid = call.currentMatch!.user1 == auth.userModel!.uid
+                              ? call.currentMatch!.user2
+                              : call.currentMatch!.user1;
+                          try {
+                            await DatabaseService().sendFriendRequest(auth.userModel!.uid, partnerUid);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Friend request sent to ${call.partnerName}!'),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to send request.'),
+                                  backgroundColor: AppColors.error,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      ),
                     // Report button
                     PopupMenuButton<String>(
                       icon: const Icon(Icons.more_vert, color: Colors.white70),

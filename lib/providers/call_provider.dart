@@ -126,8 +126,8 @@ class CallProvider extends ChangeNotifier {
         await _startCallAsInitiator(matchId, currentUser.uid,
             partner['uid'] as String);
       } else if (_state == CallState.searching) {
-        // Try again in 2 seconds
-        await Future.delayed(const Duration(seconds: 2));
+        // Try again in 500 milliseconds (Ultra-fast searching)
+        await Future.delayed(const Duration(milliseconds: 500));
         tryOnce();
       }
     }

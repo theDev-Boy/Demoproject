@@ -91,7 +91,7 @@ class DatabaseService {
           .set({
         'status': 'searching',
         'gender': user.gender,
-        'interestedIn': user.interestedIn,
+        'age': user.age,
         'country': user.countryCode,
         'name': user.name,
         'joinedAt': ServerValue.timestamp,
@@ -138,28 +138,10 @@ class DatabaseService {
         if (currentUser.blockedUsers.contains(partnerUid)) continue;
 
         // Gender preference matching
-        final partnerGender = partnerData['gender'] as String? ?? '';
-        final partnerInterestedIn =
-            (partnerData['interestedIn'] as List<dynamic>?)
-                    ?.map((e) => e.toString())
-                    .toList() ??
-                [];
-
-        // Check if current user's interests match partner's gender
-        if (!_isGenderMatch(
-            currentUser.interestedIn, partnerGender)) {
-          continue;
-        }
-
-        // Check if partner's interests match current user's gender
-        if (!_isGenderMatch(partnerInterestedIn, currentUser.gender)) {
-          continue;
-        }
-
         return {
           'uid': partnerUid,
           'name': partnerData['name'] as String? ?? 'Anonymous',
-          'gender': partnerGender,
+          'gender': partnerData['gender'] as String? ?? '',
           'country': partnerData['country'] as String? ?? '',
         };
       }
@@ -168,15 +150,6 @@ class DatabaseService {
       logger.e('Failed to find partner', error: e);
       return null;
     }
-  }
-
-  bool _isGenderMatch(List<String> interests, String gender) {
-    if (interests.contains('Everyone')) return true;
-    if (interests.isEmpty) return true;
-    if (gender == 'Male' && interests.contains('Men')) return true;
-    if (gender == 'Female' && interests.contains('Women')) return true;
-    if (gender == 'Other') return true; // Everyone can match Other
-    return false;
   }
 
   // ---------------------------------------------------------------------------
@@ -382,6 +355,112 @@ class DatabaseService {
       return snapshot.exists;
     } catch (e) {
       return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // FRIENDS SYSTEM
+  // ---------------------------------------------------------------------------
+
+  /// Send a friend request.
+  Future<void> sendFriendRequest(String senderUid, String receiverUid) async {
+    try {
+      final receiverRef = _db.ref(AppConstants.usersPath).child(receiverUid).child('friendRequests');
+      final snapshot = await receiverRef.get();
+      List<String> requests = [];
+      if (snapshot.exists && snapshot.value != null) {
+        requests = (snapshot.value as List<dynamic>).map((e) => e.toString()).toList();
+      }
+      if (!requests.contains(senderUid)) {
+        requests.add(senderUid);
+        await receiverRef.set(requests);
+      }
+    } catch (e) {
+      logger.e('Failed to send friend request', error: e);
+      rethrow;
+    }
+  }
+
+  /// Accept a friend request.
+  Future<void> acceptFriendRequest(String myUid, String senderUid) async {
+    try {
+      // 1. Remove from requests
+      final myRequestsRef = _db.ref(AppConstants.usersPath).child(myUid).child('friendRequests');
+      final reqSnapshot = await myRequestsRef.get();
+      if (reqSnapshot.exists && reqSnapshot.value != null) {
+        List<String> requests = (reqSnapshot.value as List<dynamic>).map((e) => e.toString()).toList();
+        requests.remove(senderUid);
+        await myRequestsRef.set(requests);
+      }
+
+      // 2. Add to my friends
+      final myFriendsRef = _db.ref(AppConstants.usersPath).child(myUid).child('friends');
+      final myFrSnapshot = await myFriendsRef.get();
+      List<String> myFriends = [];
+      if (myFrSnapshot.exists && myFrSnapshot.value != null) {
+        myFriends = (myFrSnapshot.value as List<dynamic>).map((e) => e.toString()).toList();
+      }
+      if (!myFriends.contains(senderUid)) {
+        myFriends.add(senderUid);
+        await myFriendsRef.set(myFriends);
+      }
+
+      // 3. Add to sender's friends
+      final senderFriendsRef = _db.ref(AppConstants.usersPath).child(senderUid).child('friends');
+      final senderFrSnapshot = await senderFriendsRef.get();
+      List<String> senderFriends = [];
+      if (senderFrSnapshot.exists && senderFrSnapshot.value != null) {
+        senderFriends = (senderFrSnapshot.value as List<dynamic>).map((e) => e.toString()).toList();
+      }
+      if (!senderFriends.contains(myUid)) {
+        senderFriends.add(myUid);
+        await senderFriendsRef.set(senderFriends);
+      }
+    } catch (e) {
+      logger.e('Failed to accept friend request', error: e);
+      rethrow;
+    }
+  }
+
+  /// Reject a friend request.
+  Future<void> rejectFriendRequest(String myUid, String senderUid) async {
+    try {
+      final myRequestsRef = _db.ref(AppConstants.usersPath).child(myUid).child('friendRequests');
+      final reqSnapshot = await myRequestsRef.get();
+      if (reqSnapshot.exists && reqSnapshot.value != null) {
+        List<String> requests = (reqSnapshot.value as List<dynamic>).map((e) => e.toString()).toList();
+        requests.remove(senderUid);
+        await myRequestsRef.set(requests);
+      }
+    } catch (e) {
+      logger.e('Failed to reject friend request', error: e);
+      rethrow;
+    }
+  }
+
+  /// Remove a friend.
+  Future<void> removeFriend(String myUid, String friendUid) async {
+    try {
+      // 1. Remove from my friends
+      final myFriendsRef = _db.ref(AppConstants.usersPath).child(myUid).child('friends');
+      final myFrSnapshot = await myFriendsRef.get();
+      if (myFrSnapshot.exists && myFrSnapshot.value != null) {
+        List<String> myFriends = (myFrSnapshot.value as List<dynamic>).map((e) => e.toString()).toList();
+        myFriends.remove(friendUid);
+        await myFriendsRef.set(myFriends);
+      }
+
+      // 2. Remove from their friends
+      final senderFriendsRef = _db.ref(AppConstants.usersPath).child(friendUid).child('friends');
+      final senderFrSnapshot = await senderFriendsRef.get();
+      if (senderFrSnapshot.exists && senderFrSnapshot.value != null) {
+        List<String> senderFriends = (senderFrSnapshot.value as List<dynamic>).map((e) => e.toString()).toList();
+        senderFriends.remove(myUid);
+        await senderFriendsRef.set(senderFriends);
+      }
+    } catch (e) {
+      logger.e('Failed to remove friend', error: e);
+      rethrow;
     }
   }
 

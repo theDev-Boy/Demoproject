@@ -6,6 +6,7 @@ import 'config/app_typography.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'routes/app_router.dart';
+import 'widgets/offline_wrapper.dart';
 
 class ZuumeetApp extends StatelessWidget {
   const ZuumeetApp({super.key});
@@ -94,6 +95,9 @@ class ZuumeetApp extends StatelessWidget {
       ),
       themeMode: themeProvider.themeMode,
       routerConfig: router,
+      builder: (context, child) {
+        return OfflineWrapper(child: child!);
+      },
     );
   }
 }
