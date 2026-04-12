@@ -42,7 +42,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
       textInputAction: widget.textInputAction,
       obscureText: widget.isPassword ? _obscureText : false,
       onChanged: widget.onChanged,
-      style: AppTypography.bodyLarge.copyWith(color: AppColors.textPrimary),
+      style: AppTypography.bodyLarge,
       decoration: InputDecoration(
         hintText: widget.hintText,
         hintStyle:
@@ -62,7 +62,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
               )
             : null,
         filled: true,
-        fillColor: AppColors.backgroundSecondary,
+        fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? AppColors.backgroundSecondary,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusL),
           borderSide: BorderSide.none,

@@ -7,6 +7,7 @@ import '../screens/gender_selection_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/call_screen.dart';
 import '../screens/history_screen.dart';
+import '../screens/settings_screen.dart';
 
 /// App-wide route configuration using GoRouter.
 class AppRouter {
@@ -44,6 +45,11 @@ class AppRouter {
           path: '/history',
           name: 'history',
           builder: (context, state) => const HistoryScreen(),
+        ),
+        GoRoute(
+          path: '/settings',
+          name: 'settings',
+          builder: (context, state) => const SettingsScreen(),
         ),
       ],
       redirect: (context, state) {

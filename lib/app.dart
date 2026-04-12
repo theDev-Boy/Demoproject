@@ -4,6 +4,7 @@ import 'config/app_colors.dart';
 import 'config/app_dimensions.dart';
 import 'config/app_typography.dart';
 import 'providers/auth_provider.dart';
+import 'providers/theme_provider.dart';
 import 'routes/app_router.dart';
 
 class ZuumeetApp extends StatelessWidget {
@@ -13,6 +14,7 @@ class ZuumeetApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.read<AuthProvider>();
     final router = AppRouter.router(authProvider);
+    final themeProvider = context.watch<ThemeProvider>();
 
     return MaterialApp.router(
       title: 'Zuumeet',
@@ -65,6 +67,32 @@ class ZuumeetApp extends StatelessWidget {
           contentPadding: const EdgeInsets.all(16),
         ),
       ),
+      darkTheme: ThemeData.dark(useMaterial3: true).copyWith(
+        primaryColor: AppColors.primary,
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        appBarTheme: AppBarTheme(
+          backgroundColor: const Color(0xFF121212),
+          elevation: 0,
+          titleTextStyle: AppTypography.headlineMedium.copyWith(color: Colors.white),
+          centerTitle: true,
+          iconTheme: const IconThemeData(color: Colors.white70),
+        ),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primary,
+          brightness: Brightness.dark,
+          primary: AppColors.primary,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF1E1E1E),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.all(16),
+        ),
+      ),
+      themeMode: themeProvider.themeMode,
       routerConfig: router,
     );
   }
