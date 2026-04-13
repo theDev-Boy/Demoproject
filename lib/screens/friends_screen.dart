@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config/app_colors.dart';
-import '../config/app_dimensions.dart';
 import '../config/app_typography.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
@@ -79,20 +77,22 @@ class _FriendsScreenState extends State<FriendsScreen> {
   void _startDirectCall(String partnerUid) async {
     final myUid = context.read<AuthProvider>().firebaseUser!.uid;
     try {
-      // Create a direct call request in FB Realtime DB!
-      // This immediately triggers the receiver's full screen notification listener.
       await FirebaseDatabase.instance.ref('direct_calls').child(partnerUid).set({
         'callerId': myUid,
         'callerName': context.read<AuthProvider>().userModel!.name,
         'timestamp': ServerValue.timestamp,
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Calling... waiting for answer.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Calling... waiting for answer.')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to place call.'), backgroundColor: AppColors.error),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to place call.'), backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 

@@ -81,10 +81,9 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.videocam_rounded,
-                    color: Colors.white,
-                    size: 52,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Image.asset('logo.png', fit: BoxFit.contain),
                   ),
                 ),
                 const SizedBox(height: 28),

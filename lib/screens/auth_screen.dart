@@ -180,7 +180,10 @@ class _AuthScreenState extends State<AuthScreen>
                               color: AppColors.primary,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 40),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Image.asset('logo.png', fit: BoxFit.contain),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 20),

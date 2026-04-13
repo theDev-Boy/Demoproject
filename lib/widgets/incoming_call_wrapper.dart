@@ -3,13 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:go_router/go_router.dart';
-import '../models/match_model.dart';
 import '../providers/auth_provider.dart';
-import '../providers/call_provider.dart';
 import '../services/database_service.dart';
 import '../config/app_colors.dart';
 import '../config/app_typography.dart';
-import '../config/app_dimensions.dart';
 
 class IncomingCallWrapper extends StatefulWidget {
   final Widget child;
@@ -88,7 +85,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
 
     try {
       // 1. Create a Match record officially
-      final matchId = await _dbService.createMatch(
+      await _dbService.createMatch(
          user1: callerId, 
          user2: myUid, 
          user1Name: callerName, 
@@ -134,7 +131,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
                    children: [
                      Column(
                        children: [
-                         const Icon(Icons.videocam_rounded, size: 80, color: AppColors.primary),
+                         Image.asset('logo.png', width: 80, height: 80),
                          const SizedBox(height: 24),
                          Text('INCOMING CALL', style: AppTypography.headlineMedium.copyWith(color: Colors.white70, letterSpacing: 2)),
                          const SizedBox(height: 16),

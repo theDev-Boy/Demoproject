@@ -194,10 +194,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   Column(
                     children: [
-                      Icon(
-                        Icons.people_alt_rounded,
-                        size: screenW < 360 ? 100 : 140,
-                        color: AppColors.primary.withValues(alpha: 0.15),
+                      Image.asset(
+                        'logo.png',
+                        width: screenW < 360 ? 100 : 140,
+                        height: screenW < 360 ? 100 : 140,
                       ),
                       const SizedBox(height: 20),
                       Text(
