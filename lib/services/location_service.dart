@@ -32,20 +32,20 @@ class LocationService {
 
   Future<Map<String, String>?> _getFromIP() async {
     try {
-      // First try ip-api
+      // First try freeipapi (HTTPS)
       var response = await http
-          .get(Uri.parse('http://ip-api.com/json/?fields=country,countryCode'))
+          .get(Uri.parse('https://freeipapi.com/api/json'))
           .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return {
-          'country': data['country'] as String? ?? 'Unknown Location',
+          'country': data['countryName'] as String? ?? 'Unknown Location',
           'countryCode': data['countryCode'] as String? ?? '',
         };
       }
 
-      // Fallback to ipapi.co
+      // Fallback to ipapi.co (HTTPS)
       response = await http
           .get(Uri.parse('https://ipapi.co/json/'))
           .timeout(const Duration(seconds: 4));

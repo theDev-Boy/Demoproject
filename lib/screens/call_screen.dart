@@ -142,9 +142,18 @@ class _CallScreenState extends State<CallScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           if (call.partnerCountry != null && call.partnerCountry!.isNotEmpty)
-                            Text(
-                              call.partnerCountry!,
-                              style: const TextStyle(color: Colors.white60, fontSize: 13),
+                            Row(
+                              children: [
+                                const Icon(Icons.public, color: Colors.white60, size: 14),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    call.partnerCountry!,
+                                    style: const TextStyle(color: Colors.white60, fontSize: 13),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
                         ],
                       ),
