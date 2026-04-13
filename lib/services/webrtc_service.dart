@@ -164,17 +164,42 @@ class WebRTCService {
       'offerToReceiveAudio': true,
       'offerToReceiveVideo': true,
     });
-    await _peerConnection!.setLocalDescription(offer);
-    logger.i('[WebRTC] Offer created');
-    return offer;
+    
+    // Mangle SDP to force higher bitrate
+    final mangledSdp = _setVideoBitrate(offer.sdp!, 1500);
+    final mangledOffer = RTCSessionDescription(mangledSdp, offer.type);
+    
+    await _peerConnection!.setLocalDescription(mangledOffer);
+    logger.i('[WebRTC] Offer created with bitrate mangling');
+    return mangledOffer;
   }
 
   /// Create an SDP answer (callee / receiver side).
   Future<RTCSessionDescription> createAnswer() async {
     final answer = await _peerConnection!.createAnswer();
-    await _peerConnection!.setLocalDescription(answer);
-    logger.i('[WebRTC] Answer created');
-    return answer;
+    
+    // Mangle SDP to force higher bitrate
+    final mangledSdp = _setVideoBitrate(answer.sdp!, 1500);
+    final mangledAnswer = RTCSessionDescription(mangledSdp, answer.type);
+    
+    await _peerConnection!.setLocalDescription(mangledAnswer);
+    logger.i('[WebRTC] Answer created with bitrate mangling');
+    return mangledAnswer;
+  }
+
+  /// Force a specific video bitrate in the SDP.
+  String _setVideoBitrate(String sdp, int bitrate) {
+    final lines = sdp.split('\r\n');
+    final mangledLines = <String>[];
+    
+    for (int i = 0; i < lines.length; i++) {
+      mangledLines.add(lines[i]);
+      if (lines[i].startsWith('m=video')) {
+        // Add bitrate line right after the media definition
+        mangledLines.add('b=AS:$bitrate');
+      }
+    }
+    return mangledLines.join('\r\n');
   }
 
   /// Set the remote SDP description (offer or answer from partner).

@@ -10,6 +10,7 @@ import '../services/permission_service.dart';
 import '../widgets/custom_button.dart';
 import 'friends_screen.dart';
 import 'history_screen.dart';
+import 'room_discovery_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -74,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _currentIndex,
         children: [
           _buildHomeTab(context),
+          const RoomDiscoveryScreen(),
           const FriendsScreen(),
           const HistoryScreen(),
         ],
@@ -90,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.videocam_rounded), label: 'Chat'),
+          BottomNavigationBarItem(icon: Icon(Icons.mic_external_on_rounded), label: 'Rooms'),
           BottomNavigationBarItem(icon: Icon(Icons.group_rounded), label: 'Friends'),
           BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: 'History'),
         ],
@@ -195,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Column(
                     children: [
                       Image.asset(
-                        'logo.png',
+                        'logo1.png',
                         width: screenW < 360 ? 100 : 140,
                         height: screenW < 360 ? 100 : 140,
                       ),

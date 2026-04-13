@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../config/app_colors.dart';
-import '../config/app_typography.dart';
 import '../providers/auth_provider.dart';
 import '../utils/constants.dart';
 
@@ -64,44 +62,11 @@ class _SplashScreenState extends State<SplashScreen>
           opacity: _fadeAnim,
           child: ScaleTransition(
             scale: _scaleAnim,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 110,
-                  height: 110,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.3),
-                        blurRadius: 30,
-                        spreadRadius: 5,
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Image.asset('logo.png', fit: BoxFit.contain),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                Text(
-                  'Zuumeet',
-                  style: AppTypography.displayLarge.copyWith(
-                    color: AppColors.primary,
-                    fontSize: 36,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Connect with people around the world',
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
+            child: Image.asset(
+              'logo1.png',
+              width: 180,
+              height: 180,
+              fit: BoxFit.contain,
             ),
           ),
         ),

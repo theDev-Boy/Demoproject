@@ -123,29 +123,120 @@ class _FriendsScreenState extends State<FriendsScreen> {
         final user = UserModel.fromJson(userData, authUser.uid);
         final isDark = Theme.of(context).brightness == Brightness.dark;
 
-        return DefaultTabController(
-          length: 2,
-          child: Column(
-            children: [
-              TabBar(
-                indicatorColor: AppColors.primary,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textSecondary,
-                tabs: [
-                  Tab(text: 'Friends (${user.friends.length})'),
-                  Tab(text: 'Requests (${user.friendRequests.length})'),
-                ],
-              ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _buildFriendsList(user, isDark),
-                    _buildRequestsList(user, isDark),
+        return Scaffold(
+          body: DefaultTabController(
+            length: 2,
+            child: Column(
+              children: [
+                TabBar(
+                  indicatorColor: AppColors.primary,
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: AppColors.textSecondary,
+                  tabs: [
+                    Tab(text: 'Friends (${user.friends.length})'),
+                    Tab(text: 'Requests (${user.friendRequests.length})'),
                   ],
                 ),
-              ),
-            ],
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _buildFriendsList(user, isDark),
+                      _buildRequestsList(user, isDark),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => _showGlobalDiscovery(user),
+            backgroundColor: AppColors.primary,
+            icon: const Icon(Icons.person_add_rounded, color: Colors.white),
+            label: const Text('Add Friends', style: TextStyle(color: Colors.white)),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showGlobalDiscovery(UserModel currentUser) async {
+    final allUsers = await _db.getAllUsers();
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        // Filter out me, already friends, and pending requests
+        final discoveryList = allUsers.where((u) => 
+          u.uid != currentUser.uid && 
+          !currentUser.friends.contains(u.uid)
+        ).toList();
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Discover People', style: AppTypography.headlineMedium),
+                      IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Connect with global users of Zuumeet', style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary)),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: discoveryList.isEmpty 
+                      ? const Center(child: Text('No new users to discover right now.'))
+                      : ListView.separated(
+                          itemCount: discoveryList.length, 
+                          separatorBuilder: (_, __) => const Divider(),
+                          itemBuilder: (context, index) {
+                            final user = discoveryList[index];
+                            final isPending = user.friendRequests.contains(currentUser.uid);
+
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: CircleAvatar(
+                                backgroundColor: AppColors.primary,
+                                child: Text(user.initials, style: const TextStyle(color: Colors.white)),
+                              ),
+                              title: Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(user.country.isNotEmpty ? user.country : 'Unknown Location'),
+                              trailing: isPending 
+                                ? const Text('Requested', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold))
+                                : ElevatedButton(
+                                    onPressed: () async {
+                                      await _db.sendFriendRequest(currentUser.uid, user.uid);
+                                      setModalState(() {}); // Refresh local UI
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                       backgroundColor: AppColors.primary,
+                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                       padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    ),
+                                    child: const Text('Add', style: TextStyle(color: Colors.white)),
+                                  ),
+                            );
+                          },
+                        ),
+                  ),
+                ],
+              ),
+            );
+          }
         );
       },
     );

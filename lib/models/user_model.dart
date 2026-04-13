@@ -17,6 +17,9 @@ class UserModel extends Equatable {
   final List<String> blockedUsers;
   final List<String> friends;
   final List<String> friendRequests;
+  final String avatarUrl;
+  final String frameId;
+  final bool isVip;
 
   const UserModel({
     required this.uid,
@@ -34,6 +37,9 @@ class UserModel extends Equatable {
     this.blockedUsers = const [],
     this.friends = const [],
     this.friendRequests = const [],
+    this.avatarUrl = '',
+    this.frameId = 'free_border',
+    this.isVip = false,
   });
 
   factory UserModel.fromJson(Map<dynamic, dynamic> json, String uid) {
@@ -62,6 +68,9 @@ class UserModel extends Equatable {
               ?.map((e) => e.toString())
               .toList() ??
           [],
+      avatarUrl: json['avatarUrl'] as String? ?? '',
+      frameId: json['frameId'] as String? ?? 'free_border',
+      isVip: json['isVip'] as bool? ?? false,
     );
   }
 
@@ -82,6 +91,9 @@ class UserModel extends Equatable {
       'blockedUsers': blockedUsers,
       'friends': friends,
       'friendRequests': friendRequests,
+      'avatarUrl': avatarUrl,
+      'frameId': frameId,
+      'isVip': isVip,
     };
   }
 
@@ -99,6 +111,9 @@ class UserModel extends Equatable {
     List<String>? blockedUsers,
     List<String>? friends,
     List<String>? friendRequests,
+    String? avatarUrl,
+    String? frameId,
+    bool? isVip,
   }) {
     return UserModel(
       uid: uid,
@@ -116,6 +131,9 @@ class UserModel extends Equatable {
       blockedUsers: blockedUsers ?? this.blockedUsers,
       friends: friends ?? this.friends,
       friendRequests: friendRequests ?? this.friendRequests,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      frameId: frameId ?? this.frameId,
+      isVip: isVip ?? this.isVip,
     );
   }
 

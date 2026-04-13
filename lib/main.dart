@@ -8,6 +8,8 @@ import 'providers/call_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/theme_provider.dart';
 import 'config/firebase_config.dart';
+import 'services/ad_manager.dart';
+import 'providers/room_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +32,9 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Initialize Unity Ads
+  await AdManager.init();
+
   runApp(
     MultiProvider(
       providers: [
@@ -37,6 +42,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => CallProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => RoomProvider()),
       ],
       child: const ZuumeetApp(),
     ),

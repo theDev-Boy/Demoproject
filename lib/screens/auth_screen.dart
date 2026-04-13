@@ -182,7 +182,7 @@ class _AuthScreenState extends State<AuthScreen>
                             ),
                             child: Padding(
                               padding: const EdgeInsets.all(12.0),
-                              child: Image.asset('logo.png', fit: BoxFit.contain),
+                              child: Image.asset('logo1.png', fit: BoxFit.contain),
                             ),
                           ),
                         ),

@@ -35,7 +35,9 @@ class ZuumeetApp extends StatelessWidget {
         appBarTheme: AppBarTheme(
           backgroundColor: AppColors.background,
           elevation: 0,
-          titleTextStyle: AppTypography.headlineMedium.copyWith(color: AppColors.textPrimary),
+          titleTextStyle: AppTypography.headlineMedium.copyWith(
+            color: AppColors.textPrimary,
+          ),
           centerTitle: true,
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
@@ -75,7 +77,9 @@ class ZuumeetApp extends StatelessWidget {
         appBarTheme: AppBarTheme(
           backgroundColor: const Color(0xFF121212),
           elevation: 0,
-          titleTextStyle: AppTypography.headlineMedium.copyWith(color: Colors.white),
+          titleTextStyle: AppTypography.headlineMedium.copyWith(
+            color: Colors.white,
+          ),
           centerTitle: true,
           iconTheme: const IconThemeData(color: Colors.white70),
         ),
@@ -97,9 +101,7 @@ class ZuumeetApp extends StatelessWidget {
       themeMode: themeProvider.themeMode,
       routerConfig: router,
       builder: (context, child) {
-        return OfflineWrapper(
-           child: IncomingCallWrapper(child: child!)
-        );
+        return OfflineWrapper(child: IncomingCallWrapper(child: child!));
       },
     );
   }

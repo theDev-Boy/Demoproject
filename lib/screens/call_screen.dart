@@ -112,7 +112,7 @@ class _CallScreenState extends State<CallScreen> {
                   children: [
                     // Minimize button
                     IconButton(
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 30),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 24),
                       tooltip: 'Minimize',
                       onPressed: () => context.pop(),
                     ),

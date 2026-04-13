@@ -131,7 +131,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
                    children: [
                      Column(
                        children: [
-                         Image.asset('logo.png', width: 80, height: 80),
+                         Image.asset('logo1.png', width: 80, height: 80),
                          const SizedBox(height: 24),
                          Text('INCOMING CALL', style: AppTypography.headlineMedium.copyWith(color: Colors.white70, letterSpacing: 2)),
                          const SizedBox(height: 16),

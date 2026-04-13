@@ -6,15 +6,11 @@ import '../models/user_model.dart';
 import '../services/database_service.dart';
 import '../services/webrtc_service.dart';
 import '../utils/logger.dart';
+import '../utils/constants.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 /// States of a video call.
-enum CallState {
-  idle,
-  searching,
-  connecting,
-  connected,
-  ended,
-}
+enum CallState { idle, searching, connecting, connected, ended }
 
 /// Manages the entire video call lifecycle.
 class CallProvider extends ChangeNotifier {
@@ -72,19 +68,60 @@ class CallProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Initialize local stream
+      // 1. Pre-warm: Initialize local stream immediately
       final localStream = await _webrtc.initLocalStream();
       localRenderer.srcObject = localStream;
       notifyListeners();
 
-      // Join search queue
+      // 2. Join search queue
       await _db.joinSearchQueue(currentUser);
 
-      // Attempt to find a partner
-      _attemptMatch(currentUser);
+      // 3. LISTEN FOR OTHER SEARCHING USERS (Instant Reaction)
+      _searchSub = FirebaseDatabase.instance
+          .ref(AppConstants.activeUsersPath)
+          .onValue
+          .listen((event) async {
+            if (_state != CallState.searching || !event.snapshot.exists) return;
 
-      // Also listen for being matched by someone else
-      _searchSub = _db.listenForMatch(currentUser.uid).listen((event) {
+            final data = event.snapshot.value as Map<dynamic, dynamic>;
+            for (final entry in data.entries) {
+              final partnerUid = entry.key as String;
+              if (partnerUid == currentUser.uid) continue;
+
+              final partnerData = entry.value as Map<dynamic, dynamic>;
+              final partnerStatus = partnerData['status'] as String? ?? '';
+
+              // ATOMIC CONFLICT RESOLUTION:
+              // If both users see each other, the one with the smallest UID string becomes the initiator.
+              if (partnerStatus == 'searching') {
+                final isInitiator = currentUser.uid.compareTo(partnerUid) < 0;
+
+                if (isInitiator) {
+                  // I am the initiator: Create and push match ID
+                  final matchId = await _db.createMatch(
+                    user1: currentUser.uid,
+                    user2: partnerUid,
+                    user1Name: currentUser.name,
+                    user2Name: partnerData['name'] as String? ?? 'Anonymous',
+                  );
+
+                  _partnerName = partnerData['name'] as String? ?? 'Anonymous';
+                  _partnerCountry = partnerData['country'] as String? ?? '';
+                  _currentMatch = await _db.getMatch(matchId);
+
+                  await _startCallAsInitiator(
+                    matchId,
+                    currentUser.uid,
+                    partnerUid,
+                  );
+                  break;
+                }
+              }
+            }
+          });
+
+      // 4. LISTEN FOR BEING MATCHED BY SOMEONE ELSE
+      _db.listenForMatch(currentUser.uid).listen((event) {
         if (!event.snapshot.exists || event.snapshot.value == null) return;
         final data = event.snapshot.value as Map<dynamic, dynamic>;
         final status = data['status'] as String? ?? '';
@@ -97,57 +134,35 @@ class CallProvider extends ChangeNotifier {
       });
     } catch (e) {
       logger.e('Failed to start searching', error: e);
-      _error = 'Failed to start. Please check camera permissions.';
+      _error = 'Connecting failed. Please check camera permission.';
       _state = CallState.idle;
       notifyListeners();
     }
   }
 
-  /// Periodically try to find a partner (every 2 seconds).
-  void _attemptMatch(UserModel currentUser) {
-    Future<void> tryOnce() async {
-      if (_state != CallState.searching) return;
-
-      final partner = await _db.findPartner(currentUser);
-      if (partner != null && _state == CallState.searching) {
-        // Found a match! Create it.
-        final matchId = await _db.createMatch(
-          user1: currentUser.uid,
-          user2: partner['uid'] as String,
-          user1Name: currentUser.name,
-          user2Name: partner['name'] as String,
-        );
-
-        _partnerName = partner['name'] as String?;
-        _partnerCountry = partner['country'] as String?;
-        _currentMatch = await _db.getMatch(matchId);
-
-        // I am the initiator → create offer
-        await _startCallAsInitiator(matchId, currentUser.uid,
-            partner['uid'] as String);
-      } else if (_state == CallState.searching) {
-        // Try again in 100 milliseconds (Omegle-like ultra-fast searching)
-        await Future.delayed(const Duration(milliseconds: 100));
-        tryOnce();
-      }
-    }
-
-    tryOnce();
-  }
-
   /// Called when another user matched us.
   Future<void> _onMatchedByPartner(
-      String matchId, UserModel currentUser) async {
+    String matchId,
+    UserModel currentUser,
+  ) async {
+    // Avoid double matching
+    if (_state != CallState.searching) return;
+
     try {
       _currentMatch = await _db.getMatch(matchId);
       if (_currentMatch == null) return;
 
       _partnerName =
-          _currentMatch!.getPartnerName(currentUser.uid) ?? 'Anonymous';
+          _currentMatch!.getPartnerName(currentUser.uid) ?? 'Partner';
 
-      // I am NOT the initiator → wait for offer, then send answer
+      // Stop the main search listener once matched
+      _searchSub?.cancel();
+
       await _startCallAsReceiver(
-          matchId, currentUser.uid, _currentMatch!.getPartnerUid(currentUser.uid));
+        matchId,
+        currentUser.uid,
+        _currentMatch!.getPartnerUid(currentUser.uid),
+      );
     } catch (e) {
       logger.e('Error handling match', error: e);
     }
@@ -158,7 +173,10 @@ class CallProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   Future<void> _startCallAsInitiator(
-      String matchId, String myUid, String partnerUid) async {
+    String matchId,
+    String myUid,
+    String partnerUid,
+  ) async {
     _state = CallState.connecting;
     notifyListeners();
 
@@ -181,7 +199,8 @@ class CallProvider extends ChangeNotifier {
 
       _webrtc.onConnectionStateChange = (state) {
         if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
-            state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+            state ==
+                RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
           endCall(myUid);
         }
       };
@@ -190,10 +209,7 @@ class CallProvider extends ChangeNotifier {
 
       // Create and send offer
       final offer = await _webrtc.createOffer();
-      await _db.sendOffer(matchId, {
-        'type': offer.type,
-        'sdp': offer.sdp,
-      });
+      await _db.sendOffer(matchId, {'type': offer.type, 'sdp': offer.sdp});
 
       // Listen for answer
       _answerSub = _db.listenForAnswer(matchId).listen((event) async {
@@ -207,8 +223,9 @@ class CallProvider extends ChangeNotifier {
       });
 
       // Listen for ICE candidates from partner
-      _candidateSub =
-          _db.listenForCandidates(matchId, partnerUid).listen((event) async {
+      _candidateSub = _db.listenForCandidates(matchId, partnerUid).listen((
+        event,
+      ) async {
         if (!event.snapshot.exists || event.snapshot.value == null) return;
         final data = event.snapshot.value as Map<dynamic, dynamic>;
         final candidate = RTCIceCandidate(
@@ -220,8 +237,7 @@ class CallProvider extends ChangeNotifier {
       });
 
       // Listen for partner ending the call
-      _matchStatusSub =
-          _db.listenForMatchStatus(matchId).listen((event) {
+      _matchStatusSub = _db.listenForMatchStatus(matchId).listen((event) {
         if (!event.snapshot.exists) return;
         final status = event.snapshot.value as String?;
         if (status == 'ended' && _state == CallState.connected) {
@@ -237,7 +253,10 @@ class CallProvider extends ChangeNotifier {
   }
 
   Future<void> _startCallAsReceiver(
-      String matchId, String myUid, String partnerUid) async {
+    String matchId,
+    String myUid,
+    String partnerUid,
+  ) async {
     _state = CallState.connecting;
     notifyListeners();
 
@@ -259,7 +278,8 @@ class CallProvider extends ChangeNotifier {
 
       _webrtc.onConnectionStateChange = (state) {
         if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
-            state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+            state ==
+                RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
           endCall(myUid);
         }
       };
@@ -278,15 +298,13 @@ class CallProvider extends ChangeNotifier {
 
         // Create and send answer
         final answer = await _webrtc.createAnswer();
-        await _db.sendAnswer(matchId, {
-          'type': answer.type,
-          'sdp': answer.sdp,
-        });
+        await _db.sendAnswer(matchId, {'type': answer.type, 'sdp': answer.sdp});
       });
 
       // Listen for ICE candidates from partner
-      _candidateSub =
-          _db.listenForCandidates(matchId, partnerUid).listen((event) async {
+      _candidateSub = _db.listenForCandidates(matchId, partnerUid).listen((
+        event,
+      ) async {
         if (!event.snapshot.exists || event.snapshot.value == null) return;
         final data = event.snapshot.value as Map<dynamic, dynamic>;
         final candidate = RTCIceCandidate(
@@ -298,8 +316,7 @@ class CallProvider extends ChangeNotifier {
       });
 
       // Listen for partner ending the call
-      _matchStatusSub =
-          _db.listenForMatchStatus(matchId).listen((event) {
+      _matchStatusSub = _db.listenForMatchStatus(matchId).listen((event) {
         if (!event.snapshot.exists) return;
         final status = event.snapshot.value as String?;
         if (status == 'ended' && _state == CallState.connected) {
@@ -377,28 +394,10 @@ class CallProvider extends ChangeNotifier {
     _partnerCountry = null;
     _callDurationSeconds = 0;
 
-    _state = CallState.searching;
+    _state = CallState.idle; // Trigger a fresh start
     notifyListeners();
 
-    // Re-join search queue and find a new partner
-    await _db.joinSearchQueue(currentUser);
-    final localStream = await _webrtc.initLocalStream();
-    localRenderer.srcObject = localStream;
-    notifyListeners();
-
-    _attemptMatch(currentUser);
-
-    _searchSub = _db.listenForMatch(currentUser.uid).listen((event) {
-      if (!event.snapshot.exists || event.snapshot.value == null) return;
-      final data = event.snapshot.value as Map<dynamic, dynamic>;
-      final status = data['status'] as String? ?? '';
-      if (status == 'matched' && _state == CallState.searching) {
-        final matchId = data['matchId'] as String?;
-        if (matchId != null) {
-          _onMatchedByPartner(matchId, currentUser);
-        }
-      }
-    });
+    await startSearching(currentUser);
   }
 
   /// Stop (completely leave) - end call and go back to home.

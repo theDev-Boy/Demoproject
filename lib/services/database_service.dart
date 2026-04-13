@@ -132,12 +132,13 @@ class DatabaseService {
 
         final partnerData = entry.value as Map<dynamic, dynamic>;
         final partnerStatus = partnerData['status'] as String? ?? '';
+        
+        // ONLY match with people explicitly searching
         if (partnerStatus != 'searching') continue;
 
-        // Check if they are blocked
+        // Skip blocked users
         if (currentUser.blockedUsers.contains(partnerUid)) continue;
 
-        // Gender preference matching
         return {
           'uid': partnerUid,
           'name': partnerData['name'] as String? ?? 'Anonymous',
@@ -493,6 +494,26 @@ class DatabaseService {
       return history;
     } catch (e) {
       logger.e('Failed to get call history', error: e);
+      return [];
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // GLOBAL USER DISCOVERY
+  // ---------------------------------------------------------------------------
+
+  /// Fetch all users in the system (for manual discovery).
+  Future<List<UserModel>> getAllUsers() async {
+    try {
+      final snapshot = await _db.ref(AppConstants.usersPath).get();
+      if (!snapshot.exists || snapshot.value == null) return [];
+
+      final data = snapshot.value as Map<dynamic, dynamic>;
+      return data.entries.map((e) {
+        return UserModel.fromJson(e.value as Map<dynamic, dynamic>, e.key as String);
+      }).toList();
+    } catch (e) {
+      logger.e('Failed to get all users', error: e);
       return [];
     }
   }

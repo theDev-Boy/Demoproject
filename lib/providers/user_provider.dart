@@ -22,4 +22,22 @@ class UserProvider extends ChangeNotifier {
     _profile = user;
     notifyListeners();
   }
+
+  Future<void> updateAvatarAndFrame(String uid, String avatarUrl, String frameId) async {
+    try {
+      await _db.updateUser(uid, {
+        'avatarUrl': avatarUrl,
+        'frameId': frameId,
+      });
+      if (_profile != null) {
+        _profile = _profile!.copyWith(
+          avatarUrl: avatarUrl,
+          frameId: frameId,
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Failed to update avatar/frame: $e');
+    }
+  }
 }
