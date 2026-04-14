@@ -4,7 +4,8 @@ import '../utils/logger.dart';
 class AdManager {
   static const String gameId = '6080976';
   static const String interstitialPlacementId = 'Interstitial_Android';
-  static const bool testMode = false; // Set to true for development
+  static const String rewardedPlacementId = 'Rewarded_Android';
+  static const bool testMode = true; // Set to true for development
 
   static DateTime? _lastAdTime;
   static bool _isInitialized = false;
@@ -20,6 +21,7 @@ class AdManager {
         _isInitialized = true;
         logger.i('[AdManager] Unity Ads Initialized');
         _loadInterstitial();
+        _loadRewarded();
       },
       onFailed: (error, message) {
         logger.e('[AdManager] Unity Ads Initialization Failed: $error - $message');
@@ -33,6 +35,15 @@ class AdManager {
       placementId: interstitialPlacementId,
       onComplete: (placementId) => logger.i('[AdManager] Interstitial Loaded'),
       onFailed: (placementId, error, message) => logger.e('[AdManager] Interstitial Load Failed: $error - $message'),
+    );
+  }
+
+  /// Load a rewarded ad.
+  static void _loadRewarded() {
+    UnityAds.load(
+      placementId: rewardedPlacementId,
+      onComplete: (placementId) => logger.i('[AdManager] Rewarded Loaded'),
+      onFailed: (placementId, error, message) => logger.e('[AdManager] Rewarded Load Failed: $error - $message'),
     );
   }
 
@@ -67,6 +78,29 @@ class AdManager {
       onFailed: (placementId, error, message) {
         logger.e('[AdManager] Ad Failed: $error - $message');
         onFailed?.call(message);
+      },
+    );
+  }
+
+  /// Show a rewarded ad.
+  static Future<void> showRewardedAd({
+    required Function onComplete,
+    required Function(String error) onFailed,
+  }) async {
+    if (!_isInitialized) {
+      onFailed('Not initialized');
+      return;
+    }
+
+    await UnityAds.showVideoAd(
+      placementId: rewardedPlacementId,
+      onComplete: (placementId) {
+        _loadRewarded();
+        onComplete();
+      },
+      onFailed: (placementId, error, message) {
+        _loadRewarded();
+        onFailed(message);
       },
     );
   }

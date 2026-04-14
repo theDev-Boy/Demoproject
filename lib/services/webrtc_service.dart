@@ -257,9 +257,32 @@ class WebRTCService {
   // CLEANUP
   // ---------------------------------------------------------------------------
 
-  /// Dispose of all WebRTC resources properly.
+  /// Close ONLY the peer connection, keep local camera alive.
+  Future<void> stopPeerConnection() async {
+    try {
+      if (_peerConnection != null) {
+        // Remove all listeners first
+        _peerConnection!.onIceCandidate = null;
+        _peerConnection!.onTrack = null;
+        _peerConnection!.onIceConnectionState = null;
+        _peerConnection!.onConnectionState = null;
+        _peerConnection!.onIceGatheringState = null;
+        
+        await _peerConnection!.close();
+        _peerConnection = null;
+      }
+      _remoteStream = null;
+      logger.i('[WebRTC] PeerConnection closed (Local stream preserved)');
+    } catch (e) {
+      logger.e('[WebRTC] Error closing peer connection', error: e);
+    }
+  }
+
+  /// Dispose of all WebRTC resources properly (full stop).
   Future<void> dispose() async {
     try {
+      await stopPeerConnection();
+
       // Stop and dispose local tracks.
       if (_localStream != null) {
         for (final track in _localStream!.getTracks()) {
@@ -269,20 +292,13 @@ class WebRTCService {
         _localStream = null;
       }
 
-      // Close peer connection.
-      if (_peerConnection != null) {
-        await _peerConnection!.close();
-        _peerConnection = null;
-      }
-
-      _remoteStream = null;
       _isMicMuted = false;
       _isCameraOff = false;
       _isFrontCamera = true;
 
-      logger.i('[WebRTC] Resources disposed');
+      logger.i('[WebRTC] All resources disposed');
     } catch (e) {
-      logger.e('[WebRTC] Error during dispose', error: e);
+      logger.e('[WebRTC] Error during full dispose', error: e);
     }
   }
 }

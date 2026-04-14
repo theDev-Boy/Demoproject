@@ -7,6 +7,7 @@ import '../config/app_typography.dart';
 import '../models/match_model.dart';
 import '../providers/auth_provider.dart';
 import '../services/database_service.dart';
+import '../widgets/avatar_widget.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -78,9 +79,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
           elevation: 0,
           color: AppColors.backgroundSecondary,
           child: ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: AppColors.primary,
-              child: Icon(Icons.person, color: Colors.white),
+            onLongPress: () => _confirmDelete(match),
+            leading: AvatarWidget(
+              name: partnerName,
+              avatarCode: '', // In a real app we'd fetch this from the partnerId cache
+              radius: 20,
             ),
             title: Text(partnerName, style: AppTypography.button),
             subtitle: Text('$date\n$duration', style: AppTypography.caption),
@@ -89,6 +92,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         );
       },
+    );
+  }
+  void _confirmDelete(MatchModel match) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete History?'),
+        content: const Text('Do you want to remove this call from your history?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              // Delete logic here
+              Navigator.pop(context);
+            }, 
+            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
     );
   }
 }

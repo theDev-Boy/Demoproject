@@ -5,14 +5,20 @@ import 'package:provider/provider.dart';
 import 'app.dart';
 import 'providers/auth_provider.dart';
 import 'providers/call_provider.dart';
+import 'providers/chat_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/theme_provider.dart';
 import 'config/firebase_config.dart';
+import 'services/ad_service.dart';
 import 'services/ad_manager.dart';
-import 'providers/room_provider.dart';
+import 'services/call_notification_service.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Notifications
+  await CallNotificationService().init();
 
   // Initialize Firebase with explicit options for Android
   await Firebase.initializeApp(
@@ -35,14 +41,17 @@ void main() async {
   // Initialize Unity Ads
   await AdManager.init();
 
+  await AdService.init();
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => CallProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => RoomProvider()),
+
       ],
       child: const ZuumeetApp(),
     ),

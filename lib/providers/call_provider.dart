@@ -8,9 +8,10 @@ import '../services/webrtc_service.dart';
 import '../utils/logger.dart';
 import '../utils/constants.dart';
 import 'package:firebase_database/firebase_database.dart';
+import '../services/call_notification_service.dart';
 
 /// States of a video call.
-enum CallState { idle, searching, connecting, connected, ended }
+enum CallState { idle, searching, connecting, connected, ended, error }
 
 /// Manages the entire video call lifecycle.
 class CallProvider extends ChangeNotifier {
@@ -35,6 +36,17 @@ class CallProvider extends ChangeNotifier {
   StreamSubscription? _offerSub;
   StreamSubscription? _candidateSub;
   StreamSubscription? _searchSub;
+
+  // Buffer ICE candidates until remote description is set
+  final List<RTCIceCandidate> _pendingCandidates = [];
+  bool _remoteDescSet = false;
+  bool _isMinimized = false;
+
+  bool get isMinimized => _isMinimized;
+  void toggleMinimize() {
+    _isMinimized = !_isMinimized;
+    notifyListeners();
+  }
 
   // Getters
   CallState get state => _state;
@@ -68,9 +80,11 @@ class CallProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Pre-warm: Initialize local stream immediately
-      final localStream = await _webrtc.initLocalStream();
-      localRenderer.srcObject = localStream;
+      // 1. Pre-warm: Initialize local stream if not already exists
+      if (_webrtc.localStream == null) {
+        final localStream = await _webrtc.initLocalStream();
+        localRenderer.srcObject = localStream;
+      }
       notifyListeners();
 
       // 2. Join search queue
@@ -125,7 +139,7 @@ class CallProvider extends ChangeNotifier {
         if (!event.snapshot.exists || event.snapshot.value == null) return;
         final data = event.snapshot.value as Map<dynamic, dynamic>;
         final status = data['status'] as String? ?? '';
-        if (status == 'matched' && _state == CallState.searching) {
+        if (status == 'matched' && (_state == CallState.searching || _state == CallState.ended)) {
           final matchId = data['matchId'] as String?;
           if (matchId != null) {
             _onMatchedByPartner(matchId, currentUser);
@@ -146,7 +160,7 @@ class CallProvider extends ChangeNotifier {
     UserModel currentUser,
   ) async {
     // Avoid double matching
-    if (_state != CallState.searching) return;
+    if (_state != CallState.searching && _state != CallState.ended) return;
 
     try {
       _currentMatch = await _db.getMatch(matchId);
@@ -178,15 +192,19 @@ class CallProvider extends ChangeNotifier {
     String partnerUid,
   ) async {
     _state = CallState.connecting;
+    _remoteDescSet = false;
+    _pendingCandidates.clear();
     notifyListeners();
 
     try {
       // Set up WebRTC callbacks
       _webrtc.onRemoteStream = (stream) {
         remoteRenderer.srcObject = stream;
-        _state = CallState.connected;
-        _startCallTimer();
-        notifyListeners();
+        if (_state != CallState.connected) {
+          _state = CallState.connected;
+          _startCallTimer();
+          notifyListeners();
+        }
       };
 
       _webrtc.onIceCandidate = (candidate) {
@@ -220,9 +238,15 @@ class CallProvider extends ChangeNotifier {
           data['type'] as String?,
         );
         await _webrtc.setRemoteDescription(answer);
+        _remoteDescSet = true;
+        // Flush buffered ICE candidates
+        for (final c in _pendingCandidates) {
+          await _webrtc.addIceCandidate(c);
+        }
+        _pendingCandidates.clear();
       });
 
-      // Listen for ICE candidates from partner
+      // Listen for ICE candidates from partner (buffer if remote desc not set)
       _candidateSub = _db.listenForCandidates(matchId, partnerUid).listen((
         event,
       ) async {
@@ -233,7 +257,13 @@ class CallProvider extends ChangeNotifier {
           data['sdpMid'] as String?,
           data['sdpMLineIndex'] as int?,
         );
-        await _webrtc.addIceCandidate(candidate);
+        if (_remoteDescSet) {
+          logger.i('[WebRTC] Adding candidate immediately');
+          await _webrtc.addIceCandidate(candidate);
+        } else {
+          logger.i('[WebRTC] Buffering candidate');
+          _pendingCandidates.add(candidate);
+        }
       });
 
       // Listen for partner ending the call
@@ -258,14 +288,18 @@ class CallProvider extends ChangeNotifier {
     String partnerUid,
   ) async {
     _state = CallState.connecting;
+    _remoteDescSet = false;
+    _pendingCandidates.clear();
     notifyListeners();
 
     try {
       _webrtc.onRemoteStream = (stream) {
         remoteRenderer.srcObject = stream;
-        _state = CallState.connected;
-        _startCallTimer();
-        notifyListeners();
+        if (_state != CallState.connected) {
+          _state = CallState.connected;
+          _startCallTimer();
+          notifyListeners();
+        }
       };
 
       _webrtc.onIceCandidate = (candidate) {
@@ -295,13 +329,19 @@ class CallProvider extends ChangeNotifier {
           data['type'] as String?,
         );
         await _webrtc.setRemoteDescription(offer);
+        _remoteDescSet = true;
+        // Flush buffered ICE candidates
+        for (final c in _pendingCandidates) {
+          await _webrtc.addIceCandidate(c);
+        }
+        _pendingCandidates.clear();
 
         // Create and send answer
         final answer = await _webrtc.createAnswer();
         await _db.sendAnswer(matchId, {'type': answer.type, 'sdp': answer.sdp});
       });
 
-      // Listen for ICE candidates from partner
+      // Listen for ICE candidates from partner (buffer if remote desc not set)
       _candidateSub = _db.listenForCandidates(matchId, partnerUid).listen((
         event,
       ) async {
@@ -312,7 +352,13 @@ class CallProvider extends ChangeNotifier {
           data['sdpMid'] as String?,
           data['sdpMLineIndex'] as int?,
         );
-        await _webrtc.addIceCandidate(candidate);
+        if (_remoteDescSet) {
+          logger.i('[WebRTC] Adding candidate immediately');
+          await _webrtc.addIceCandidate(candidate);
+        } else {
+          logger.i('[WebRTC] Buffering candidate');
+          _pendingCandidates.add(candidate);
+        }
       });
 
       // Listen for partner ending the call
@@ -331,10 +377,40 @@ class CallProvider extends ChangeNotifier {
     }
   }
 
-  void _onPartnerEndedCall() {
+  void _onPartnerEndedCall() async {
     _stopCallTimer();
+    _cancelSubscriptions();
+    
+    // Dismiss notification
+    CallNotificationService().dismissCallNotification();
+    
+    // Clean up WebRTC peer connection but KEEP the local camera alive
+    await _webrtc.stopPeerConnection();
+    remoteRenderer.srcObject = null;
+    
+    // Re-attach local stream to renderer (fixes Phone B camera disappearing)
+    if (_webrtc.localStream != null) {
+      localRenderer.srcObject = _webrtc.localStream;
+      logger.i('[CallProvider] Local stream re-attached to renderer');
+    }
+    
+    _currentMatch = null;
+    _partnerName = null;
+    _partnerCountry = null;
+    _callDurationSeconds = 0;
+    _remoteDescSet = false;
+    _pendingCandidates.clear();
+    
     _state = CallState.ended;
     notifyListeners();
+    
+    // Auto-return to idle after 2 seconds so user can search again
+    Timer(const Duration(seconds: 2), () {
+      if (_state == CallState.ended) {
+        _state = CallState.idle;
+        notifyListeners();
+      }
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -366,6 +442,8 @@ class CallProvider extends ChangeNotifier {
     }
     await _db.leaveSearchQueue(myUid);
     await _webrtc.dispose();
+    
+    CallNotificationService().dismissCallNotification();
 
     localRenderer.srcObject = null;
     remoteRenderer.srcObject = null;
@@ -386,15 +464,24 @@ class CallProvider extends ChangeNotifier {
     if (_currentMatch != null) {
       await _db.endMatch(_currentMatch!.matchId);
     }
-    await _webrtc.dispose();
+    await _webrtc.stopPeerConnection();
+    
+    CallNotificationService().dismissCallNotification();
 
     remoteRenderer.srcObject = null;
     _currentMatch = null;
     _partnerName = null;
     _partnerCountry = null;
     _callDurationSeconds = 0;
+    _remoteDescSet = false;
+    _pendingCandidates.clear();
 
-    _state = CallState.idle; // Trigger a fresh start
+    // Re-attach local stream (keeps camera visible during search)
+    if (_webrtc.localStream != null) {
+      localRenderer.srcObject = _webrtc.localStream;
+    }
+
+    _state = CallState.idle;
     notifyListeners();
 
     await startSearching(currentUser);

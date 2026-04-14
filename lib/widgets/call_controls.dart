@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../config/app_colors.dart';
-import '../config/app_dimensions.dart';
 
 /// Bottom control bar for the video call screen.
-class CallControls extends StatelessWidget {
+class CallControls extends StatefulWidget {
   final bool isMicMuted;
   final bool isCameraOff;
   final VoidCallback onToggleMic;
@@ -24,48 +23,71 @@ class CallControls extends StatelessWidget {
   });
 
   @override
+  State<CallControls> createState() => _CallControlsState();
+}
+
+class _CallControlsState extends State<CallControls> with SingleTickerProviderStateMixin {
+  late final AnimationController _shakeCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _shakeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+  }
+
+  @override
+  void dispose() {
+    _shakeCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppDimensions.spacingL,
-        vertical: AppDimensions.spacingM,
+        horizontal: 20,
+        vertical: 16,
       ),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusCircle),
+        color: Colors.black.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: Colors.white10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           _ControlButton(
-            icon: isMicMuted ? Icons.mic_off : Icons.mic,
-            isActive: !isMicMuted,
-            onTap: onToggleMic,
+            icon: widget.isMicMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+            isActive: !widget.isMicMuted,
+            onTap: widget.onToggleMic,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           _ControlButton(
-            icon: isCameraOff ? Icons.videocam_off : Icons.videocam,
-            isActive: !isCameraOff,
-            onTap: onToggleCamera,
+            icon: widget.isCameraOff ? Icons.videocam_off_rounded : Icons.videocam_rounded,
+            isActive: !widget.isCameraOff,
+            onTap: widget.onToggleCamera,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           _ControlButton(
-            icon: Icons.cameraswitch,
+            icon: Icons.flip_camera_ios_rounded,
             isActive: true,
-            onTap: onSwitchCamera,
+            onTap: widget.onSwitchCamera,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           _ControlButton(
-            icon: Icons.skip_next,
+            icon: Icons.skip_next_rounded,
             isActive: true,
-            onTap: onNext,
+            onTap: widget.onNext,
             color: AppColors.primary,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           _ControlButton(
-            icon: Icons.call_end,
+            icon: Icons.call_end_rounded,
             isActive: false,
-            onTap: onEndCall,
+            onTap: widget.onEndCall,
             color: AppColors.error,
           ),
         ],
@@ -89,18 +111,23 @@ class _ControlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = color ?? (isActive ? Colors.transparent : AppColors.error);
+    final bgColor = color ?? (isActive ? Colors.white.withValues(alpha: 0.15) : AppColors.error.withValues(alpha: 0.3));
+    final iconColor = isActive ? Colors.white : (color != null ? Colors.white : AppColors.error);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 48,
-        height: 48,
+        width: 52,
+        height: 52,
         decoration: BoxDecoration(
           color: bgColor,
           shape: BoxShape.circle,
+          boxShadow: color != null ? [
+            BoxShadow(color: color!.withValues(alpha: 0.3), blurRadius: 12, spreadRadius: 1)
+          ] : null,
         ),
-        child: Icon(icon, color: Colors.white, size: 24),
+        child: Icon(icon, color: color != null ? Colors.white : iconColor, size: 26),
       ),
     );
   }

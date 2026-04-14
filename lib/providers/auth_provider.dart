@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'dart:math';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
@@ -23,7 +24,11 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoggedIn => _firebaseUser != null;
   bool get isNewUser => _isNewUser;
   bool get hasCompletedProfile =>
-      _userModel != null && _userModel!.gender.isNotEmpty;
+      _userModel != null && 
+      _userModel!.gender.isNotEmpty && 
+      _userModel!.name.isNotEmpty && 
+      _userModel!.age.isNotEmpty && 
+      _userModel!.displayId.isNotEmpty;
 
   AuthProvider() {
     _init();
@@ -45,6 +50,14 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _loadUserModel(String uid) async {
     _userModel = await _databaseService.getUser(uid);
+    
+    // Legacy support: if user has no displayId, generate and save it now
+    if (_userModel != null && _userModel!.displayId.isEmpty) {
+      final newDisplayId = (Random().nextInt(900000) + 100000).toString();
+      await _databaseService.updateUser(uid, {'displayId': newDisplayId});
+      _userModel = _userModel!.copyWith(displayId: newDisplayId);
+      logger.i('Generated legacy UID for user $uid: $newDisplayId');
+    }
   }
 
   /// Reload the user model from Firebase.
@@ -85,12 +98,15 @@ class AuthProvider extends ChangeNotifier {
         await _authService.updateDisplayName(name);
 
         final now = DateTime.now().millisecondsSinceEpoch;
+        final displayId = (Random().nextInt(900000) + 100000).toString(); // 100000 to 999999
+
         final newUser = UserModel(
           uid: user.uid,
           name: name,
           email: email,
           createdAt: now,
           lastActive: now,
+          displayId: displayId,
         );
         await _databaseService.saveUser(newUser);
         _userModel = newUser;
@@ -165,6 +181,8 @@ class AuthProvider extends ChangeNotifier {
         if (existing == null) {
           // New Google user
           final now = DateTime.now().millisecondsSinceEpoch;
+          final displayId = (Random().nextInt(900000) + 100000).toString();
+
           final newUser = UserModel(
             uid: user.uid,
             name: user.displayName ?? 'User',
@@ -172,6 +190,7 @@ class AuthProvider extends ChangeNotifier {
             photoUrl: user.photoURL,
             createdAt: now,
             lastActive: now,
+            displayId: displayId,
           );
           await _databaseService.saveUser(newUser);
           _userModel = newUser;
@@ -220,25 +239,33 @@ class AuthProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   Future<void> updateProfile({
-    required String gender,
-    required String age,
-    required String country,
-    required String countryCode,
+    String? name,
+    String? gender,
+    String? age,
+    String? country,
+    String? countryCode,
+    String? avatarUrl,
   }) async {
     if (_firebaseUser == null || _userModel == null) return;
     _setLoading(true);
     try {
-      await _databaseService.updateUser(_firebaseUser!.uid, {
-        'gender': gender,
-        'age': age,
-        'country': country,
-        'countryCode': countryCode,
-      });
+      final Map<String, dynamic> updates = {};
+      if (name != null) updates['name'] = name;
+      if (gender != null) updates['gender'] = gender;
+      if (age != null) updates['age'] = age;
+      if (country != null) updates['country'] = country;
+      if (countryCode != null) updates['countryCode'] = countryCode;
+      if (avatarUrl != null) updates['avatarUrl'] = avatarUrl;
+
+      await _databaseService.updateUser(_firebaseUser!.uid, updates);
+      
       _userModel = _userModel!.copyWith(
+        name: name,
         gender: gender,
         age: age,
         country: country,
         countryCode: countryCode,
+        avatarUrl: avatarUrl,
       );
       _isNewUser = false;
     } catch (e) {

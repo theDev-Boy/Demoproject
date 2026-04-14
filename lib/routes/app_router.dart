@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -8,6 +9,10 @@ import '../screens/home_screen.dart';
 import '../screens/call_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/chat_screen.dart';
+import '../screens/avatar_selection_screen.dart';
+import '../screens/audio_call_screen.dart';
+import '../screens/friends_screen.dart';
 
 /// App-wide route configuration using GoRouter.
 class AppRouter {
@@ -50,6 +55,37 @@ class AppRouter {
           path: '/settings',
           name: 'settings',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/chat/:chatId',
+          name: 'chat',
+          builder: (context, state) {
+            final chatId = state.pathParameters['chatId']!;
+            return ChatScreen(chatId: chatId);
+          },
+        ),
+        GoRoute(
+          path: '/avatar-selection',
+          name: 'avatar-selection',
+          builder: (context, state) => const AvatarSelectionScreen(),
+        ),
+        GoRoute(
+          path: '/audio-call',
+          name: 'audio-call',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>;
+            return AudioCallScreen(
+              partnerUid: extra['partnerUid'] as String,
+              partnerName: extra['partnerName'] as String,
+              partnerAvatar: extra['partnerAvatar'] as String? ?? '',
+              isOutgoing: extra['isOutgoing'] as bool? ?? true,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/friends',
+          name: 'friends',
+          builder: (context, state) => const Scaffold(body: FriendsScreen()),
         ),
       ],
       redirect: (context, state) {

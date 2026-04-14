@@ -10,8 +10,9 @@ import '../services/permission_service.dart';
 import '../widgets/custom_button.dart';
 import 'friends_screen.dart';
 import 'history_screen.dart';
-import 'room_discovery_screen.dart';
 
+import 'messenger_screen.dart';
+import '../widgets/avatar_widget.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -75,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _currentIndex,
         children: [
           _buildHomeTab(context),
-          const RoomDiscoveryScreen(),
+          const MessengerScreen(),
           const FriendsScreen(),
           const HistoryScreen(),
         ],
@@ -91,8 +92,8 @@ class _HomeScreenState extends State<HomeScreen> {
         unselectedItemColor: AppColors.textSecondary,
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.videocam_rounded), label: 'Chat'),
-          BottomNavigationBarItem(icon: Icon(Icons.mic_external_on_rounded), label: 'Rooms'),
+          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.message_rounded), label: 'Messenger'),
           BottomNavigationBarItem(icon: Icon(Icons.group_rounded), label: 'Friends'),
           BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: 'History'),
         ],
@@ -137,13 +138,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(
+                          AvatarWidget(
+                            name: user.name,
+                            avatarCode: user.avatarUrl,
                             radius: screenW < 360 ? 22 : 28,
-                            backgroundColor: AppColors.primary,
-                            child: Text(
-                              user.initials,
-                              style: TextStyle(color: Colors.white, fontSize: screenW < 360 ? 14 : 16, fontWeight: FontWeight.bold),
-                            ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(

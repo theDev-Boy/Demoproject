@@ -7,6 +7,8 @@ import '../config/app_typography.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/custom_button.dart';
+import '../widgets/avatar_widget.dart';
+import '../services/ad_manager.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -75,17 +77,50 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    CircleAvatar(
+                    AvatarWidget(
+                      name: user.name,
+                      avatarCode: user.avatarUrl,
                       radius: 40,
-                      backgroundColor: AppColors.primary,
-                      child: Text(user.initials, style: const TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 16),
                     Text(user.name, style: AppTypography.headlineMedium),
                     const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'UID: ${user.displayId.isNotEmpty ? user.displayId : 'N/A'}',
+                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     Text(
                       auth.firebaseUser?.email ?? 'Google Linked Account',
-                      style: AppTypography.bodyMedium.copyWith(color: Colors.grey),
+                      style: AppTypography.bodySmall.copyWith(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: () {
+                        // Watch ad before changing profile
+                        AdManager.showRewardedAd(
+                          onComplete: () {
+                            context.push('/avatar-selection');
+                          },
+                          onFailed: (error) {
+                             // Even if ad fails, we allow for now but notify users
+                             ScaffoldMessenger.of(context).showSnackBar(
+                               SnackBar(content: Text('Watch ad failed: $error'), backgroundColor: AppColors.error),
+                             );
+                             context.push('/avatar-selection');
+                          },
+                        );
+                      },
+                      icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
+                      label: const Text('Watch Ad to Change Profile'),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.primary),
                     ),
                     const SizedBox(height: 8),
                     Row(

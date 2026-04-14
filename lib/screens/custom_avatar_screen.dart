@@ -167,10 +167,10 @@ class _CustomAvatarScreenState extends State<CustomAvatarScreen> {
               length: 2,
               child: Column(
                 children: [
-                  const TabBar(
+                   TabBar(
                     indicatorColor: AppColors.primary,
                     labelColor: AppColors.primary,
-                    tabs: [Tab(text: 'AVATARS'), Tab(text: 'FRAMES')],
+                    tabs: const [Tab(text: 'AVATARS'), Tab(text: 'FRAMES')],
                   ),
                   Expanded(
                     child: TabBarView(

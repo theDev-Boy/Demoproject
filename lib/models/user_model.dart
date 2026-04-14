@@ -20,6 +20,7 @@ class UserModel extends Equatable {
   final String avatarUrl;
   final String frameId;
   final bool isVip;
+  final String displayId; // 6-digit numeric ID
 
   const UserModel({
     required this.uid,
@@ -40,6 +41,7 @@ class UserModel extends Equatable {
     this.avatarUrl = '',
     this.frameId = 'free_border',
     this.isVip = false,
+    this.displayId = '',
   });
 
   factory UserModel.fromJson(Map<dynamic, dynamic> json, String uid) {
@@ -71,6 +73,7 @@ class UserModel extends Equatable {
       avatarUrl: json['avatarUrl'] as String? ?? '',
       frameId: json['frameId'] as String? ?? 'free_border',
       isVip: json['isVip'] as bool? ?? false,
+      displayId: json['displayId'] as String? ?? '',
     );
   }
 
@@ -94,6 +97,7 @@ class UserModel extends Equatable {
       'avatarUrl': avatarUrl,
       'frameId': frameId,
       'isVip': isVip,
+      'displayId': displayId,
     };
   }
 
@@ -114,6 +118,7 @@ class UserModel extends Equatable {
     String? avatarUrl,
     String? frameId,
     bool? isVip,
+    String? displayId,
   }) {
     return UserModel(
       uid: uid,
@@ -134,6 +139,7 @@ class UserModel extends Equatable {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       frameId: frameId ?? this.frameId,
       isVip: isVip ?? this.isVip,
+      displayId: displayId ?? this.displayId,
     );
   }
 

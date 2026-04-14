@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   connectivity_plus
+  emoji_picker_flutter
   firebase_auth
   firebase_core
   flutter_webrtc

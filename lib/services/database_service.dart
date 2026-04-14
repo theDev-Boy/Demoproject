@@ -517,4 +517,26 @@ class DatabaseService {
       return [];
     }
   }
+
+  /// Find a user by their unique 6-digit displayId.
+  Future<UserModel?> getUserByDisplayId(String displayId) async {
+    try {
+      final snapshot = await _db
+          .ref(AppConstants.usersPath)
+          .orderByChild('displayId')
+          .equalTo(displayId)
+          .get();
+
+      if (!snapshot.exists || snapshot.value == null) return null;
+
+      final data = snapshot.value as Map<dynamic, dynamic>;
+      if (data.isEmpty) return null;
+
+      final entry = data.entries.first;
+      return UserModel.fromJson(entry.value as Map<dynamic, dynamic>, entry.key as String);
+    } catch (e) {
+      logger.e('Failed to get user by displayId', error: e);
+      return null;
+    }
+  }
 }

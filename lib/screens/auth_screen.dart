@@ -79,6 +79,14 @@ class _AuthScreenState extends State<AuthScreen>
 
 
 
+  void _onGoogleSignIn() async {
+    final auth = context.read<AuthProvider>();
+    final success = await auth.signInWithGoogle();
+    if (!success && mounted) {
+      _showError(auth.error ?? 'Google sign in failed');
+    }
+  }
+
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -126,11 +134,26 @@ class _AuthScreenState extends State<AuthScreen>
               onPressed: () async {
                 if (resetEmailCtrl.text.trim().isNotEmpty) {
                   final auth = context.read<AuthProvider>();
-                  await auth.sendPasswordReset(resetEmailCtrl.text.trim());
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Check your email for a reset link!')),
+                  final success = await auth.sendPasswordReset(resetEmailCtrl.text.trim());
+                  
+                  if (success && ctx.mounted) {
+                    Navigator.pop(ctx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please check your email (including Spam folder) for the reset link!'),
+                          duration: Duration(seconds: 6),
+                          backgroundColor: AppColors.success,
+                        ),
+                      );
+                    }
+                  } else if (!success && ctx.mounted) {
+                    // Show error on top of the modal or via snackbar
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(
+                        content: Text(auth.error ?? 'Failed to send reset email'),
+                        backgroundColor: AppColors.error,
+                      ),
                     );
                   }
                 }
@@ -149,10 +172,12 @@ class _AuthScreenState extends State<AuthScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenH = MediaQuery.sizeOf(context).height;
 
-    return Stack(
-      children: [
-        Scaffold(
-          body: SafeArea(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Stack(
+        children: [
+          Scaffold(
+            body: SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
@@ -171,19 +196,10 @@ class _AuthScreenState extends State<AuthScreen>
 
                         // LOGO
                         Center(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 600),
-                            curve: Curves.easeOutBack,
-                            width: 80,
-                            height: 80,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: Image.asset('logo1.png', fit: BoxFit.contain),
-                            ),
+                          child: Image.asset(
+                            'logo1.png', 
+                            height: 120, 
+                            fit: BoxFit.contain
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -244,8 +260,8 @@ class _AuthScreenState extends State<AuthScreen>
                           child: IndexedStack(
                             index: _tabController.index,
                             children: [
-                              _buildLoginForm(),
-                              _buildSignUpForm(),
+                              _buildLoginForm(isDark),
+                              _buildSignUpForm(isDark),
                             ],
                           ),
                         ),
@@ -268,10 +284,11 @@ class _AuthScreenState extends State<AuthScreen>
         ),
         if (isLoading) const LoadingOverlay(),
       ],
-    );
+    ),
+   );
   }
 
-  Widget _buildLoginForm() {
+  Widget _buildLoginForm(bool isDark) {
     return Form(
       key: _loginFormKey,
       child: Column(
@@ -291,6 +308,7 @@ class _AuthScreenState extends State<AuthScreen>
             isPassword: true,
             controller: _loginPasswordCtrl,
             validator: Validators.password,
+            textInputAction: TextInputAction.done,
           ),
           Align(
             alignment: Alignment.centerRight,
@@ -309,12 +327,47 @@ class _AuthScreenState extends State<AuthScreen>
             height: 56,
             onPressed: _onLogin,
           ),
+          const SizedBox(height: 24),
+          _buildSocialDivider(isDark),
+          const SizedBox(height: 24),
+          _buildGoogleButton(isDark),
         ],
       ),
     );
   }
 
-  Widget _buildSignUpForm() {
+  Widget _buildSocialDivider(bool isDark) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: isDark ? Colors.grey[800] : Colors.grey[300])),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text('OR', style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary)),
+        ),
+        Expanded(child: Divider(color: isDark ? Colors.grey[800] : Colors.grey[300])),
+      ],
+    );
+  }
+
+  Widget _buildGoogleButton(bool isDark) {
+    return OutlinedButton.icon(
+      onPressed: _onGoogleSignIn,
+      icon: Image.network(
+        'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg', 
+        height: 24,
+        errorBuilder: (context, error, stackTrace) => const Icon(Icons.g_mobiledata_rounded, size: 24),
+      ),
+      label: const Text('Continue with Google', style: TextStyle(fontWeight: FontWeight.w600)),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: isDark ? Colors.white : Colors.black87,
+        minimumSize: const Size(double.infinity, 56),
+        side: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusL)),
+      ),
+    );
+  }
+
+  Widget _buildSignUpForm(bool isDark) {
     return Form(
       key: _signUpFormKey,
       child: Column(
@@ -349,6 +402,7 @@ class _AuthScreenState extends State<AuthScreen>
             isPassword: true,
             controller: _signUpConfirmCtrl,
             validator: (v) => Validators.confirmPassword(v, _signUpPasswordCtrl.text),
+            textInputAction: TextInputAction.done,
           ),
           const SizedBox(height: 20),
           CustomButton(
@@ -356,6 +410,10 @@ class _AuthScreenState extends State<AuthScreen>
             height: 56,
             onPressed: _onSignUp,
           ),
+          const SizedBox(height: 24),
+          _buildSocialDivider(isDark),
+          const SizedBox(height: 24),
+          _buildGoogleButton(isDark),
         ],
       ),
     );

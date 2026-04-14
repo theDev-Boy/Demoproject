@@ -6,7 +6,8 @@ import '../config/app_typography.dart';
 /// A beautiful pulsing animation shown while waiting to match with someone.
 /// Mimics a radar/sonar scan effect with rippling circles.
 class SearchingAnimation extends StatefulWidget {
-  const SearchingAnimation({super.key});
+  final bool isConnecting;
+  const SearchingAnimation({super.key, this.isConnecting = false});
 
   @override
   State<SearchingAnimation> createState() => _SearchingAnimationState();
@@ -95,8 +96,8 @@ class _SearchingAnimationState extends State<SearchingAnimation>
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.person_search_rounded,
+                  child: Icon(
+                    widget.isConnecting ? Icons.sync_rounded : Icons.radar_rounded,
                     color: Colors.white,
                     size: 36,
                   ),
@@ -114,11 +115,15 @@ class _SearchingAnimationState extends State<SearchingAnimation>
           builder: (context, _) {
             final dotCount = (_dotCtrl.value * 4).floor() % 4;
             final dots = '.' * dotCount;
+            String text = 'Finding someone';
+            if (widget.isConnecting) text = 'Connecting';
+            
             return Text(
-              'Finding someone$dots',
+              '$text$dots',
               style: AppTypography.headlineSmall.copyWith(
                 color: Colors.white,
-                fontSize: 20,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
               ),
             );
           },
@@ -127,10 +132,12 @@ class _SearchingAnimationState extends State<SearchingAnimation>
         const SizedBox(height: 12),
 
         Text(
-          'Please wait while we connect you\nwith someone amazing',
+          widget.isConnecting 
+              ? 'Establishing secure P2P link...'
+              : 'Hold on, we\'re finding\nfresh matches for you',
           textAlign: TextAlign.center,
           style: AppTypography.bodyMedium.copyWith(
-            color: Colors.white60,
+            color: Colors.white70,
             height: 1.5,
           ),
         ),

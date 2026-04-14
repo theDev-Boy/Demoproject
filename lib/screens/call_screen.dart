@@ -9,6 +9,9 @@ import '../providers/call_provider.dart';
 import '../services/database_service.dart';
 import '../widgets/call_controls.dart';
 import '../widgets/searching_animation.dart';
+import '../services/call_notification_service.dart';
+import '../widgets/avatar_widget.dart';
+import '../config/app_typography.dart';
 
 class CallScreen extends StatefulWidget {
   const CallScreen({super.key});
@@ -52,8 +55,8 @@ class _CallScreenState extends State<CallScreen> {
               ),
             )
           else
-            const Positioned.fill(
-              child: SearchingAnimation(),
+            Positioned.fill(
+              child: SearchingAnimation(isConnecting: call.state == CallState.connecting),
             ),
 
           // LOCAL VIDEO — draggable PiP
@@ -98,7 +101,7 @@ class _CallScreenState extends State<CallScreen> {
             ),
 
           // TOP OVERLAY — partner info (connected state only)
-          if (call.state == CallState.connected)
+          if (call.state == CallState.connected || call.state == CallState.connecting)
             Positioned(
               top: 0,
               left: 0,
@@ -106,56 +109,70 @@ class _CallScreenState extends State<CallScreen> {
               child: Container(
                 padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 12, 20, 16),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
+                  ),
                 ),
                 child: Row(
                   children: [
                     // Minimize button
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 24),
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 32),
                       tooltip: 'Minimize',
-                      onPressed: () => context.pop(),
+                      onPressed: () {
+                        if (call.state == CallState.connected) {
+                          CallNotificationService().showOngoingCallNotification(call.partnerName ?? 'Partner');
+                        }
+                        context.pop();
+                      },
                     ),
                     const SizedBox(width: 8),
-                    // Timer
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+                    if (call.state == CallState.connected) ...[
+                      // Timer
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+                        ),
+                        child: Text(
+                          call.callDurationFormatted,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
                       ),
-                      child: Text(
-                        call.callDurationFormatted,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
+                      const SizedBox(width: 14),
+                    ],
                     // Partner info
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            call.partnerName ?? 'Partner',
-                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (call.partnerCountry != null && call.partnerCountry!.isNotEmpty)
-                            Row(
-                              children: [
-                                const Icon(Icons.public, color: Colors.white60, size: 14),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    call.partnerCountry!,
-                                    style: const TextStyle(color: Colors.white60, fontSize: 13),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
+                      child: InkWell(
+                        onTap: () => _showPartnerProfile(context, call),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              call.state == CallState.connecting ? 'Connecting...' : (call.partnerName ?? 'Partner'),
+                              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                        ],
+                            if (call.partnerCountry != null && call.partnerCountry!.isNotEmpty)
+                              Row(
+                                children: [
+                                  const Icon(Icons.public, color: Colors.white60, size: 14),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      call.partnerCountry!,
+                                      style: const TextStyle(color: Colors.white60, fontSize: 13),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                     // Live dot
@@ -176,7 +193,7 @@ class _CallScreenState extends State<CallScreen> {
                     ),
                     const SizedBox(width: 12),
                     // Add Friend button
-                    if (call.currentMatch != null)
+                    if (call.currentMatch != null && !(auth.userModel?.friends.contains(call.currentMatch!.getPartnerUid(auth.userModel!.uid)) ?? false))
                       IconButton(
                         icon: const Icon(Icons.person_add_rounded, color: Colors.white),
                         tooltip: 'Add Friend',
@@ -270,6 +287,65 @@ class _CallScreenState extends State<CallScreen> {
           ),
         ],
       ),
+    );
+  }
+  void _showPartnerProfile(BuildContext context, CallProvider call) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AvatarWidget(
+                name: call.partnerName ?? 'P',
+                radius: 50,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                call.partnerName ?? 'Partner',
+                style: AppTypography.headlineMedium,
+              ),
+              const SizedBox(height: 8),
+              if (call.partnerCountry != null)
+                Text(
+                  call.partnerCountry!,
+                  style: AppTypography.bodyLarge.copyWith(color: AppColors.textSecondary),
+                ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildAction(Icons.person_add_rounded, 'Add Friend', () {}),
+                  _buildAction(Icons.report_rounded, 'Report', () {}),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAction(IconData icon, String label, VoidCallback onTap) {
+    return Column(
+      children: [
+        IconButton.filledTonal(
+          onPressed: onTap,
+          icon: Icon(icon),
+          iconSize: 28,
+          padding: const EdgeInsets.all(12),
+        ),
+        const SizedBox(height: 8),
+        Text(label, style: AppTypography.caption),
+      ],
     );
   }
 }

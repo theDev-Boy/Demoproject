@@ -1,8 +1,6 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import '../config/app_colors.dart';
-import '../config/app_typography.dart';
-import '../widgets/custom_button.dart';
 
 class OfflineWrapper extends StatefulWidget {
   final Widget child;
@@ -40,61 +38,38 @@ class _OfflineWrapperState extends State<OfflineWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isOffline) {
-      return widget.child;
-    }
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Stack(
         children: [
           widget.child,
           if (_isOffline)
-            Positioned.fill(
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 4,
+              left: 20,
+              right: 20,
               child: Material(
-                color: isDark ? const Color(0xFF121212) : Colors.white,
-                child: Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(vertical: 40),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.wifi_off_rounded,
-                          size: 100,
-                          color: AppColors.primary.withValues(alpha: 0.5),
+                color: Colors.transparent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2))
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 20),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Waiting for network...',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'You are offline',
-                          style: AppTypography.displayMedium.copyWith(
-                            color: isDark ? Colors.white : AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40),
-                          child: Text(
-                            'Please check your internet connection and try again.',
-                            textAlign: TextAlign.center,
-                            style: AppTypography.bodyMedium.copyWith(
-                              color: AppColors.textSecondary,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        SizedBox(
-                          width: 200,
-                          child: CustomButton(
-                            text: 'Try Again',
-                            onPressed: _checkConnectivity,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),

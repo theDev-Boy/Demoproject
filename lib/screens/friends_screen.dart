@@ -7,6 +7,8 @@ import '../providers/auth_provider.dart';
 import '../services/database_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../utils/constants.dart';
+import '../widgets/avatar_widget.dart';
+import 'package:go_router/go_router.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -31,10 +33,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
+            AvatarWidget(
+              name: friend.name,
+              avatarCode: friend.avatarUrl,
               radius: 40,
-              backgroundColor: AppColors.primary,
-              child: Text(friend.initials, style: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 16),
             Text(friend.name, style: AppTypography.headlineMedium),
@@ -83,9 +85,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
         'timestamp': ServerValue.timestamp,
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Calling... waiting for answer.')),
-        );
+         context.push('/call');
       }
     } catch (e) {
       if (mounted) {
@@ -159,85 +159,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
     );
   }
 
-  void _showGlobalDiscovery(UserModel currentUser) async {
-    final allUsers = await _db.getAllUsers();
-    if (!mounted) return;
-
+  void _showGlobalDiscovery(UserModel currentUser) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        // Filter out me, already friends, and pending requests
-        final discoveryList = allUsers.where((u) => 
-          u.uid != currentUser.uid && 
-          !currentUser.friends.contains(u.uid)
-        ).toList();
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.75,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Discover People', style: AppTypography.headlineMedium),
-                      IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Connect with global users of Zuumeet', style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary)),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: discoveryList.isEmpty 
-                      ? const Center(child: Text('No new users to discover right now.'))
-                      : ListView.separated(
-                          itemCount: discoveryList.length, 
-                          separatorBuilder: (_, __) => const Divider(),
-                          itemBuilder: (context, index) {
-                            final user = discoveryList[index];
-                            final isPending = user.friendRequests.contains(currentUser.uid);
-
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: CircleAvatar(
-                                backgroundColor: AppColors.primary,
-                                child: Text(user.initials, style: const TextStyle(color: Colors.white)),
-                              ),
-                              title: Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text(user.country.isNotEmpty ? user.country : 'Unknown Location'),
-                              trailing: isPending 
-                                ? const Text('Requested', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold))
-                                : ElevatedButton(
-                                    onPressed: () async {
-                                      await _db.sendFriendRequest(currentUser.uid, user.uid);
-                                      setModalState(() {}); // Refresh local UI
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                       backgroundColor: AppColors.primary,
-                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                                    ),
-                                    child: const Text('Add', style: TextStyle(color: Colors.white)),
-                                  ),
-                            );
-                          },
-                        ),
-                  ),
-                ],
-              ),
-            );
-          }
-        );
+        return _DiscoveryModal(currentUser: currentUser);
       },
     );
   }
@@ -265,9 +193,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
               onTap: () => _showProfileInfo(friend),
               leading: Stack(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: AppColors.primary,
-                    child: Text(friend.initials, style: const TextStyle(color: Colors.white)),
+                  AvatarWidget(
+                    name: friend.name,
+                    avatarCode: friend.avatarUrl,
+                    radius: 20,
                   ),
                   Positioned(
                     right: 0,
@@ -325,9 +254,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
             final reqUser = snapshot.data!;
             return ListTile(
               onTap: () => _showProfileInfo(reqUser),
-              leading: CircleAvatar(
-                backgroundColor: AppColors.primary,
-                child: Text(reqUser.initials, style: const TextStyle(color: Colors.white)),
+              leading: AvatarWidget(
+                name: reqUser.name,
+                avatarCode: reqUser.avatarUrl,
+                radius: 20,
               ),
               title: Text(reqUser.name, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Sent you a friend request'),
@@ -346,6 +276,252 @@ class _FriendsScreenState extends State<FriendsScreen> {
               ),
             );
           },
+        );
+      },
+    );
+  }
+}
+
+class _DiscoveryModal extends StatefulWidget {
+  final UserModel currentUser;
+  const _DiscoveryModal({required this.currentUser});
+
+  @override
+  State<_DiscoveryModal> createState() => _DiscoveryModalState();
+}
+
+class _DiscoveryModalState extends State<_DiscoveryModal> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  final DatabaseService _db = DatabaseService();
+  UserModel? _foundUser;
+  bool _isSearching = false;
+  bool _hasSearched = false;
+  bool _requestSent = false;
+
+  void _onSearch() async {
+    final query = _searchCtrl.text.trim();
+    if (query.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a 6-digit UID')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _hasSearched = true;
+      _foundUser = null;
+      _requestSent = false;
+    });
+
+    final user = await _db.getUserByDisplayId(query);
+    
+    if (mounted) {
+      setState(() {
+        _isSearching = false;
+        _foundUser = user;
+        if (user != null) {
+          _requestSent = user.friendRequests.contains(widget.currentUser.uid);
+        }
+      });
+    }
+  }
+
+  void _sendRequest() async {
+    if (_foundUser == null) return;
+    
+    setState(() => _isSearching = true);
+    await _db.sendFriendRequest(widget.currentUser.uid, _foundUser!.uid);
+    
+    if (mounted) {
+      setState(() {
+        _isSearching = false;
+        _requestSent = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7 + bottomInset,
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Find Friend', style: AppTypography.headlineMedium),
+              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Enter the 6-digit numeric UID of your friend to connect.',
+            style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 24),
+          
+          // Search Bar
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchCtrl,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. 123456',
+                    counterText: '',
+                    prefixIcon: const Icon(Icons.tag_rounded),
+                    filled: true,
+                    fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[100],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: _isSearching ? null : _onSearch,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: _isSearching 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Search', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 32),
+          
+          // Result area
+          Expanded(
+            child: _hasSearched 
+              ? (_foundUser != null 
+                  ? _buildUserResult()
+                  : const Center(child: Text('No user found with this UID.')))
+              : Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.person_search_rounded, size: 64, color: AppColors.primary.withValues(alpha: 0.2)),
+                      const SizedBox(height: 16),
+                      const Text('Search result will appear here'),
+                    ],
+                  ),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserResult() {
+    final alreadyFriends = widget.currentUser.friends.contains(_foundUser!.uid);
+    final isMe = _foundUser!.uid == widget.currentUser.uid;
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+          ),
+          child: Row(
+            children: [
+              AvatarWidget(
+                name: _foundUser!.name,
+                avatarCode: _foundUser!.avatarUrl,
+                radius: 35,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_foundUser!.name, style: AppTypography.headlineSmall.copyWith(fontSize: 20)),
+                    const SizedBox(height: 4),
+                    Text(_foundUser!.country.isNotEmpty ? _foundUser!.country : 'Zuumeet User', 
+                         style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+        
+        if (isMe)
+          const Text('This is you!', style: TextStyle(fontStyle: FontStyle.italic, color: AppColors.textSecondary))
+        else if (alreadyFriends)
+          ElevatedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.check_circle_rounded),
+            label: const Text('Already Friends'),
+            style: ElevatedButton.styleFrom(
+              disabledBackgroundColor: AppColors.success.withValues(alpha: 0.2),
+              disabledForegroundColor: AppColors.success,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              minimumSize: const Size(double.infinity, 54),
+            ),
+          )
+        else if (_requestSent)
+          _buildAnimatedSuccess()
+        else
+          ElevatedButton.icon(
+            onPressed: _sendRequest,
+            icon: const Icon(Icons.person_add_rounded, color: Colors.white),
+            label: const Text('Send Friend Request', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              minimumSize: const Size(double.infinity, 54),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAnimatedSuccess() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.elasticOut,
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: value,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle_rounded, color: AppColors.success),
+                SizedBox(width: 12),
+                Text('Request Sent!', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+          ),
         );
       },
     );
