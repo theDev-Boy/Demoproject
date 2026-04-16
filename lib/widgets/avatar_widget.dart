@@ -25,11 +25,7 @@ class AvatarWidget extends StatelessWidget {
   String get initials {
     final n = displayName;
     if (n.isEmpty || n == '?') return '?';
-    final parts = n.trim().split(' ');
-    if (parts.length > 1) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return parts[0][0].toUpperCase();
+    return n.trim().isNotEmpty ? n.trim()[0].toUpperCase() : '?';
   }
 
   @override

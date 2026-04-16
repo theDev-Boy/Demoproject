@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -29,6 +30,11 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isTyping = false;
   bool _isRecording = false;
   String? _editingMessageId;
+
+  // Voice recording
+  final Stopwatch _stopwatch = Stopwatch();
+  Timer? _recordTimer;
+  String _recordDurationStr = "0:00";
 
   // Partner data
   UserModel? _partner;
@@ -103,6 +109,54 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     });
+  }
+
+  void _startRecording() {
+    setState(() {
+      _isRecording = true;
+      _stopwatch.reset();
+      _stopwatch.start();
+      _recordDurationStr = "0:00";
+    });
+    _recordTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (!mounted) return;
+      setState(() {
+        final sec = _stopwatch.elapsed.inSeconds;
+        final min = sec ~/ 60;
+        final remainingSec = sec % 60;
+        _recordDurationStr = "$min:${remainingSec.toString().padLeft(2, '0')}";
+      });
+    });
+  }
+
+  void _stopRecording({required bool cancel}) {
+    if (!_isRecording) return;
+    _recordTimer?.cancel();
+    _stopwatch.stop();
+    setState(() => _isRecording = false);
+
+    if (!cancel && _stopwatch.elapsedMilliseconds > 500) {
+      // Simulate sending WebRTC P2P voice data. 
+      // For now, storing as text with a prefix.
+      final msg = MessageModel(
+        id: '',
+        senderId: context.read<AuthProvider>().firebaseUser!.uid,
+        text: 'P2P_VOICE|$_recordDurationStr',
+        type: MessageType.voice,
+        timestamp: DateTime.now(),
+      );
+      context.read<ChatProvider>().sendMessage(widget.chatId, msg);
+      
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (_scrollCtrl.hasClients) {
+          _scrollCtrl.animateTo(
+            _scrollCtrl.position.maxScrollExtent + 60,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
   }
 
   bool _isOnlyEmoji(String text) {
@@ -502,6 +556,58 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
 
+    if (msg.type == MessageType.voice) {
+      final parts = msg.text.split('|');
+      final duration = parts.length > 1 ? parts[1] : '0:00';
+      return Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: GestureDetector(
+          onLongPress: () => _showMessageOptions(msg, isMe),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isMe ? AppColors.primary : (isDark ? const Color(0xFF2A2A2A) : Colors.grey[100]),
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(18),
+                topRight: const Radius.circular(18),
+                bottomLeft: Radius.circular(isMe ? 18 : 4),
+                bottomRight: Radius.circular(isMe ? 4 : 18),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.play_arrow_rounded, color: isMe ? Colors.white : AppColors.primary, size: 28),
+                const SizedBox(width: 8),
+                // Fake waveform
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(12, (i) {
+                    final height = 8.0 + (i % 3) * 6.0;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 1),
+                      width: 3,
+                      height: height,
+                      decoration: BoxDecoration(
+                        color: isMe ? Colors.white70 : AppColors.primary.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  duration,
+                  style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
@@ -597,7 +703,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   width: 40, height: 4, margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(2)),
                 ),
-                if (isMe)
+                if (isMe && msg.type == MessageType.text)
                   ListTile(
                     leading: const Icon(Icons.edit_rounded, color: AppColors.primary),
                     title: const Text('Edit Message'),
@@ -699,10 +805,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 )
               : GestureDetector(
-                  onLongPressStart: (_) => setState(() => _isRecording = true),
-                  onLongPressEnd: (_) {
-                    setState(() => _isRecording = false);
-                    // TODO: Send recorded voice message
+                  onLongPressStart: (_) => _startRecording(),
+                  onLongPressEnd: (_) => _stopRecording(cancel: false),
+                  onLongPressMoveUpdate: (details) {
+                    // Cancel if drag too far left
+                    if (details.localOffsetFromOrigin.dx < -50) {
+                      _stopRecording(cancel: true);
+                    }
                   },
                   child: Container(
                     padding: const EdgeInsets.all(12),
@@ -730,9 +839,9 @@ class _ChatScreenState extends State<ChatScreen> {
           decoration: const BoxDecoration(color: AppColors.error, shape: BoxShape.circle),
         ),
         const SizedBox(width: 10),
-        const Text('Recording...', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 14)),
+        Text('Recording... $_recordDurationStr', style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 14)),
         const Spacer(),
-        const Text('Release to send', style: TextStyle(color: Colors.grey, fontSize: 12)),
+        const Text('< Slide to cancel', style: TextStyle(color: Colors.grey, fontSize: 12)),
       ],
     );
   }

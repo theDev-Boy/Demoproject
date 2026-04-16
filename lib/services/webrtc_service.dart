@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../utils/ice_server_service.dart';
 import '../utils/logger.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Callback typedefs for WebRTC events.
 typedef OnRemoteStream = void Function(MediaStream stream);
@@ -43,13 +44,12 @@ class WebRTCService {
     },
     'video': {
       'mandatory': {
-        'minWidth': '320', // Ensures it works on older phones but can scale up
-        'minHeight': '240',
+        'minWidth': 640,
+        'minHeight': 480,
+        'minFrameRate': 30,
       },
-      'optional': [
-        {'frameRate': 30}, // Tries for 30fps if device can handle it, otherwise scales down naturally
-      ],
       'facingMode': 'user',
+      'optional': [],
     },
   };
 
@@ -79,6 +79,11 @@ class WebRTCService {
   /// Initialize local media stream (camera + microphone).
   Future<MediaStream> initLocalStream() async {
     try {
+      final statuses = await [Permission.camera, Permission.microphone].request();
+      if (statuses.values.any((s) => s.isDenied || s.isPermanentlyDenied)) {
+        throw Exception('Camera or microphone permissions denied.');
+      }
+
       _localStream =
           await navigator.mediaDevices.getUserMedia(_mediaConstraints);
       logger.i('[WebRTC] Local stream initialised');
@@ -100,11 +105,21 @@ class WebRTCService {
       final configuration = await _buildConfiguration();
 
       _peerConnection = await createPeerConnection(configuration);
+      
+      // Ensure audio is routed to speaker by default
+      await Helper.setSpeakerphoneOn(true);
 
-      // Add local tracks to peer connection.
+      // Add local tracks using transceivers (Unified Plan best practice)
       if (_localStream != null) {
         for (final track in _localStream!.getTracks()) {
-          await _peerConnection!.addTrack(track, _localStream!);
+          final transceiverInit = RTCRtpTransceiverInit(
+            direction: TransceiverDirection.SendRecv,
+            streams: [_localStream!],
+          );
+          await _peerConnection!.addTransceiver(
+            track: track,
+            init: transceiverInit,
+          );
         }
       }
 
@@ -165,12 +180,14 @@ class WebRTCService {
       'offerToReceiveVideo': true,
     });
     
-    // Mangle SDP to force higher bitrate
-    final mangledSdp = _setVideoBitrate(offer.sdp!, 1500);
-    final mangledOffer = RTCSessionDescription(mangledSdp, offer.type);
+    // Mangle SDP: Prefer VP8 and set bitrate
+    String sdp = offer.sdp!;
+    sdp = _preferVP8(sdp);
+    sdp = _setVideoBitrate(sdp, 1500);
     
+    final mangledOffer = RTCSessionDescription(sdp, offer.type);
     await _peerConnection!.setLocalDescription(mangledOffer);
-    logger.i('[WebRTC] Offer created with bitrate mangling');
+    logger.i('[WebRTC] Offer created with VP8 preference & bitrate mangling');
     return mangledOffer;
   }
 
@@ -178,28 +195,70 @@ class WebRTCService {
   Future<RTCSessionDescription> createAnswer() async {
     final answer = await _peerConnection!.createAnswer();
     
-    // Mangle SDP to force higher bitrate
-    final mangledSdp = _setVideoBitrate(answer.sdp!, 1500);
-    final mangledAnswer = RTCSessionDescription(mangledSdp, answer.type);
+    // Mangle SDP: Prefer VP8 and set bitrate
+    String sdp = answer.sdp!;
+    sdp = _preferVP8(sdp);
+    sdp = _setVideoBitrate(sdp, 1500);
     
+    final mangledAnswer = RTCSessionDescription(sdp, answer.type);
     await _peerConnection!.setLocalDescription(mangledAnswer);
-    logger.i('[WebRTC] Answer created with bitrate mangling');
+    logger.i('[WebRTC] Answer created with VP8 preference & bitrate mangling');
     return mangledAnswer;
+  }
+
+  /// Force VP8 to be the preferred codec (avoids buggy H.264 hardware encoders).
+  String _preferVP8(String sdp) {
+    final lines = sdp.split('\r\n');
+    int? mVideoIndex;
+    
+    for (int i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith('m=video')) {
+            mVideoIndex = i;
+            break;
+        }
+    }
+    if (mVideoIndex == null) return sdp;
+
+    // Find VP8 payload type
+    String? vp8Payload;
+    for (final line in lines) {
+        if (line.contains('VP8/90000')) {
+            final regExp = RegExp(r'a=rtpmap:(\d+) VP8/90000');
+            final match = regExp.firstMatch(line);
+            if (match != null) {
+                vp8Payload = match.group(1);
+                break;
+            }
+        }
+    }
+
+    if (vp8Payload == null) return sdp;
+
+    // Reorder the m=video line to put vp8Payload first
+    final mLine = lines[mVideoIndex];
+    final parts = mLine.split(' ');
+    final protocol = parts[2]; // e.g., UDP/TLS/RTP/SAVPF
+    final payloads = parts.sublist(3);
+    
+    payloads.remove(vp8Payload);
+    payloads.insert(0, vp8Payload);
+    
+    lines[mVideoIndex] = '${parts[0]} ${parts[1]} $protocol ${payloads.join(' ')}';
+    return lines.join('\r\n');
   }
 
   /// Force a specific video bitrate in the SDP.
   String _setVideoBitrate(String sdp, int bitrate) {
-    final lines = sdp.split('\r\n');
-    final mangledLines = <String>[];
-    
-    for (int i = 0; i < lines.length; i++) {
-      mangledLines.add(lines[i]);
-      if (lines[i].startsWith('m=video')) {
-        // Add bitrate line right after the media definition
-        mangledLines.add('b=AS:$bitrate');
-      }
+    // Check if bitrate line already exists
+    if (sdp.contains('b=AS:')) {
+      return sdp.replaceAll(RegExp(r'b=AS:\d+'), 'b=AS:$bitrate');
     }
-    return mangledLines.join('\r\n');
+    
+    // Regex to find the video media definition and its attributes
+    final regExp = RegExp(r'(m=video.*\r?\n(a=.*\r?\n)*)', multiLine: true);
+    return sdp.replaceAllMapped(regExp, (match) {
+      return '${match.group(1)}b=AS:$bitrate\r\n';
+    });
   }
 
   /// Set the remote SDP description (offer or answer from partner).

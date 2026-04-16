@@ -44,11 +44,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     final auth = context.read<AuthProvider>();
     if (auth.isLoggedIn) {
-      if (auth.hasCompletedProfile) {
-        context.go('/home');
-      } else {
-        context.go('/gender-selection');
-      }
+      context.go('/home');
     } else {
       context.go('/auth');
     }
@@ -63,7 +59,7 @@ class _SplashScreenState extends State<SplashScreen>
           child: ScaleTransition(
             scale: _scaleAnim,
             child: Image.asset(
-              'logo1.png',
+              'logo.png',
               width: 180,
               height: 180,
               fit: BoxFit.contain,

@@ -25,8 +25,6 @@ class _MessengerScreenState extends State<MessengerScreen> {
   final Map<String, UserModel> _userCache = {};
   final DatabaseService _db = DatabaseService();
 
-  Timer? _refreshTimer;
-
   @override
   void initState() {
     super.initState();
@@ -34,20 +32,10 @@ class _MessengerScreenState extends State<MessengerScreen> {
     if (auth.firebaseUser != null) {
       context.read<ChatProvider>().init(auth.firebaseUser!.uid);
     }
-    
-    // Auto-refresh every 2 seconds as requested
-    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (mounted) {
-        // Trigger re-fetch or just notify listeners if the provider uses streams
-        // ChatProvider uses streams so it's mostly auto, but we can verify presence here
-        setState(() {});
-      }
-    });
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -89,19 +77,29 @@ class _MessengerScreenState extends State<MessengerScreen> {
                 return FutureBuilder<UserModel?>(
                   future: _getUser(partnerId),
                   builder: (context, snap) {
-                    final partner = snap.data;
+                      final partner = snap.data;
                     final partnerName = partner?.name ?? 'Loading...';
                     final partnerAvatar = partner?.avatarUrl ?? '';
+                    final isBlocked = auth.userModel?.blockedUsers.contains(partnerId) ?? false;
 
                     return GestureDetector(
                       onLongPress: () => _showDeleteChatDialog(chat.chatId, partnerName),
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        tileColor: isBlocked ? AppColors.error.withValues(alpha: 0.1) : null,
                         leading: Stack(
                           children: [
-                            AvatarWidget(name: partnerName, avatarCode: partnerAvatar, radius: 28),
+                            Container(
+                              decoration: isBlocked
+                                  ? BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: AppColors.error, width: 2),
+                                    )
+                                  : null,
+                              child: AvatarWidget(name: partnerName, avatarCode: partnerAvatar, radius: 28),
+                            ),
                             // Online indicator
-                            if (partner != null && partner.isOnline)
+                            if (partner != null && partner.isOnline && !isBlocked)
                               Positioned(
                                 right: 0,
                                 bottom: 0,
@@ -121,16 +119,20 @@ class _MessengerScreenState extends State<MessengerScreen> {
                           ],
                         ),
                         title: Text(
-                          partnerName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          partnerName + (isBlocked ? ' (Blocked)' : ''),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold, 
+                            fontSize: 16,
+                            color: isBlocked ? AppColors.error : null,
+                          ),
                         ),
                         subtitle: Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            chat.lastMessage,
+                            isBlocked ? 'Tap to view or unblock.' : chat.lastMessage,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                            style: TextStyle(color: isBlocked ? AppColors.error.withValues(alpha: 0.8) : AppColors.textSecondary, fontSize: 14),
                           ),
                         ),
                         trailing: Column(
@@ -142,7 +144,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
                               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             ),
                             const SizedBox(height: 6),
-                            if (chat.unreadCounts[myUid] != null && chat.unreadCounts[myUid]! > 0)
+                            if (chat.unreadCounts[myUid] != null && chat.unreadCounts[myUid]! > 0 && !isBlocked)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                 decoration: BoxDecoration(
@@ -156,7 +158,13 @@ class _MessengerScreenState extends State<MessengerScreen> {
                               ),
                           ],
                         ),
-                        onTap: () => context.push('/chat/${chat.chatId}'),
+                        onTap: () {
+                          if (isBlocked) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot open chat with a blocked user.')));
+                            return;
+                          }
+                          context.push('/chat/${chat.chatId}');
+                        },
                       ),
                     );
                   },
@@ -164,7 +172,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
               },
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showNewChatPicker(context),
+        onPressed: () => _showNewChatPicker(),
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
       ),
@@ -204,8 +212,8 @@ class _MessengerScreenState extends State<MessengerScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Chat', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('Delete your conversation with $partnerName?\nMessages will be removed from your view.'),
+        title: const Text('Clear Chat?', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('This will delete all messages in this chat from this device only. This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -216,7 +224,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
               context.read<ChatProvider>().clearChat(chatId);
               Navigator.pop(ctx);
             },
-            child: const Text('Delete', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
+            child: const Text('Clear', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -224,7 +232,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
   }
 
   /// Show a bottom sheet with friend list to start a new chat.
-  void _showNewChatPicker(BuildContext context) async {
+  void _showNewChatPicker() async {
     final auth = context.read<AuthProvider>();
     final myUid = auth.firebaseUser!.uid;
     final chatService = ChatService();

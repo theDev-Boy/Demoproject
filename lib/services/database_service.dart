@@ -348,6 +348,27 @@ class DatabaseService {
     }
   }
 
+  /// Unblock a user.
+  Future<void> unblockUser(String myUid, String blockedUid) async {
+    try {
+      final userRef =
+          _db.ref(AppConstants.usersPath).child(myUid).child('blockedUsers');
+      final snapshot = await userRef.get();
+      if (snapshot.exists && snapshot.value != null) {
+        List<String> blocked = (snapshot.value as List<dynamic>)
+            .map((e) => e.toString())
+            .toList();
+        if (blocked.contains(blockedUid)) {
+          blocked.remove(blockedUid);
+          await userRef.set(blocked);
+        }
+      }
+    } catch (e) {
+      logger.e('Failed to unblock user', error: e);
+      rethrow;
+    }
+  }
+
   /// Check if user is banned.
   Future<bool> isUserBanned(String uid) async {
     try {

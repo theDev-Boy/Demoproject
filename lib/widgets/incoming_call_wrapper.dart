@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:vibration/vibration.dart';
 import '../providers/auth_provider.dart';
-import '../services/database_service.dart';
 import '../config/app_colors.dart';
 import '../config/app_typography.dart';
 import '../widgets/avatar_widget.dart';
@@ -20,11 +19,11 @@ class IncomingCallWrapper extends StatefulWidget {
   State<IncomingCallWrapper> createState() => _IncomingCallWrapperState();
 }
 
-class _IncomingCallWrapperState extends State<IncomingCallWrapper> with TickerProviderStateMixin {
+class _IncomingCallWrapperState extends State<IncomingCallWrapper>
+    with TickerProviderStateMixin {
   StreamSubscription? _callSub;
   Map<dynamic, dynamic>? _incomingCall;
-  final _dbService = DatabaseService();
-  
+
   late AnimationController _pulseController;
   late AnimationController _buttonController;
   Timer? _autoEndTimer;
@@ -36,7 +35,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> with TickerPr
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
-    
+
     _buttonController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -72,7 +71,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> with TickerPr
     if (auth.firebaseUser != null) {
       _setupListener(auth.firebaseUser!.uid);
     }
-    
+
     auth.addListener(() {
       if (mounted && auth.firebaseUser != null && _callSub == null) {
         _setupListener(auth.firebaseUser!.uid);
@@ -95,49 +94,69 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> with TickerPr
         .child(uid)
         .onValue
         .listen((event) {
-      if (!mounted) return;
-      if (event.snapshot.value != null) {
-        final data = Map<dynamic, dynamic>.from(event.snapshot.value as Map);
-        if (_incomingCall == null) {
-          _startRinging();
-          // Auto end after 1 minute
-          _autoEndTimer?.cancel();
-          _autoEndTimer = Timer(const Duration(minutes: 1), () => _rejectCall());
-        }
-        setState(() => _incomingCall = data);
-      } else {
-        if (_incomingCall != null) {
-          _stopRinging();
-          _autoEndTimer?.cancel();
-        }
-        setState(() => _incomingCall = null);
-      }
-    });
+          if (!mounted) return;
+          if (event.snapshot.value != null) {
+            final data = Map<dynamic, dynamic>.from(
+              event.snapshot.value as Map,
+            );
+
+            // Safety: ensure we don't receive our own call
+            final auth = context.read<AuthProvider>();
+            if (data['callerId'] == auth.firebaseUser?.uid) return;
+
+            if (_incomingCall == null) {
+              _startRinging();
+              // Auto end after 1 minute
+              _autoEndTimer?.cancel();
+              _autoEndTimer = Timer(
+                const Duration(minutes: 1),
+                () => _rejectCall(),
+              );
+            }
+            setState(() => _incomingCall = data);
+          } else {
+            if (_incomingCall != null) {
+              _stopRinging();
+              _autoEndTimer?.cancel();
+            }
+            setState(() => _incomingCall = null);
+          }
+        });
   }
 
   void _acceptCall() async {
     if (_incomingCall == null) return;
     _stopRinging();
     _autoEndTimer?.cancel();
-    
+
     final callData = _incomingCall!;
     final callerId = callData['callerId'] as String;
     final callerName = callData['callerName'] as String;
-    
+
     final auth = context.read<AuthProvider>();
     final myUid = auth.firebaseUser!.uid;
 
     try {
-      await _dbService.createMatch(
-         user1: callerId, 
-         user2: myUid, 
-         user1Name: callerName, 
-         user2Name: auth.userModel?.name ?? 'User'
-      );
+      final callType = callData['type'] as String? ?? 'video';
       await FirebaseDatabase.instance.ref('direct_calls').child(myUid).remove();
-      if (mounted) context.go('/call');
+
+      if (mounted) {
+        if (callType == 'audio') {
+          context.push(
+            '/audio-call',
+            extra: {
+              'partnerUid': callerId,
+              'partnerName': callerName,
+              'partnerAvatar': callData['callerAvatar'] as String? ?? '',
+              'isOutgoing': false,
+            },
+          );
+        } else {
+          context.go('/call');
+        }
+      }
     } catch (e) {
-       _rejectCall();
+      _rejectCall();
     }
   }
 
@@ -146,7 +165,10 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> with TickerPr
     _autoEndTimer?.cancel();
     final auth = context.read<AuthProvider>();
     if (auth.firebaseUser != null) {
-      await FirebaseDatabase.instance.ref('direct_calls').child(auth.firebaseUser!.uid).remove();
+      await FirebaseDatabase.instance
+          .ref('direct_calls')
+          .child(auth.firebaseUser!.uid)
+          .remove();
     }
     setState(() => _incomingCall = null);
   }
@@ -158,85 +180,91 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> with TickerPr
     return Stack(
       children: [
         widget.child,
-        
+
         if (_incomingCall != null)
-            Positioned.fill(
-              child: Material(
-                color: isDark ? const Color(0xFF121212) : Colors.white,
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-                      // App Logo & Name
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.asset('logo1.png', width: 24, height: 24),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'ZuuMeet',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                      
-                      const Spacer(),
-                      
-                      // Caller Avatar
-                      ScaleTransition(
-                        scale: Tween<double>(begin: 1.0, end: 1.05).animate(
-                          CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut)
+          Positioned.fill(
+            child: Material(
+              color: isDark ? const Color(0xFF121212) : Colors.white,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    // App Logo & Name
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.asset('logo.png', width: 24, height: 24),
                         ),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 2),
-                          ),
-                          child: AvatarWidget(
-                            name: _incomingCall!['callerName'] ?? '?',
-                            radius: 70,
+                        const SizedBox(width: 8),
+                        const Text(
+                          'ZuuMeet',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                      ),
-                      
-                      const SizedBox(height: 32),
-                      
-                      // Caller Name
-                      Text(
-                        _incomingCall!['callerName'] ?? 'Someone', 
-                        style: AppTypography.displayMedium.copyWith(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                        )
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Incoming calling...',
-                        style: AppTypography.bodyLarge.copyWith(
-                          color: AppColors.textSecondary,
-                          letterSpacing: 1.2,
+                      ],
+                    ),
+
+                    const Spacer(),
+
+                    // Caller Avatar
+                    ScaleTransition(
+                      scale: Tween<double>(begin: 1.0, end: 1.05).animate(
+                        CurvedAnimation(
+                          parent: _pulseController,
+                          curve: Curves.easeInOut,
                         ),
                       ),
-                      
-                      const Spacer(flex: 2),
-                      
-                      // Swipe Area / Buttons
-                      _buildSwipeControls(),
-                      
-                      const SizedBox(height: 60),
-                    ],
-                  ),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            width: 2,
+                          ),
+                        ),
+                        child: AvatarWidget(
+                          name: _incomingCall!['callerName'] ?? '?',
+                          radius: 70,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // Caller Name
+                    Text(
+                      _incomingCall!['callerName'] ?? 'Someone',
+                      style: AppTypography.displayMedium.copyWith(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Incoming calling...',
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: AppColors.textSecondary,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+
+                    const Spacer(flex: 2),
+
+                    // Swipe Area / Buttons
+                    _buildSwipeControls(),
+
+                    const SizedBox(height: 60),
+                  ],
                 ),
               ),
-            )
+            ),
+          ),
       ],
     );
   }
@@ -255,9 +283,9 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> with TickerPr
             onTap: _rejectCall,
             isAccept: false,
           ),
-          
+
           const SizedBox(width: 40),
-          
+
           // Accept Column
           _buildCallButton(
             icon: Icons.call_rounded,
@@ -284,14 +312,16 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> with TickerPr
           animation: _buttonController,
           builder: (context, child) {
             final offset = isAccept ? _buttonController.value * 10 : 0.0;
-            final shake = !isAccept ? (math.sin(_buttonController.value * math.pi * 4) * 3) : 0.0;
-            
+            final shake = !isAccept
+                ? (math.sin(_buttonController.value * math.pi * 4) * 3)
+                : 0.0;
+
             return Transform.translate(
               offset: Offset(shake, -offset),
               child: GestureDetector(
                 onPanUpdate: (details) {
-                   // Swipe logic: if swiped up enough, trigger onTap
-                   if (details.delta.dy < -10) onTap();
+                  // Swipe logic: if swiped up enough, trigger onTap
+                  if (details.delta.dy < -10) onTap();
                 },
                 child: Container(
                   width: 72,
@@ -305,7 +335,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> with TickerPr
                         blurRadius: 15,
                         spreadRadius: 2,
                         offset: const Offset(0, 4),
-                      )
+                      ),
                     ],
                   ),
                   child: Icon(icon, color: Colors.white, size: 32),

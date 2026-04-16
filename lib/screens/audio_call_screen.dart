@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../config/app_colors.dart';
-import '../config/app_typography.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/avatar_widget.dart';
 import '../services/chat_service.dart';
-import '../models/message_model.dart';
+import '../models/message_model.dart' as msg_model;
+import '../services/webrtc_service.dart';
 
 class AudioCallScreen extends StatefulWidget {
   final String partnerUid;
@@ -29,7 +30,8 @@ class AudioCallScreen extends StatefulWidget {
   State<AudioCallScreen> createState() => _AudioCallScreenState();
 }
 
-class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderStateMixin {
+class _AudioCallScreenState extends State<AudioCallScreen>
+    with TickerProviderStateMixin {
   bool _isConnected = false;
   bool _isMuted = false;
   bool _isSpeaker = false;
@@ -40,6 +42,11 @@ class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderSt
 
   late AnimationController _pulseController;
   late AnimationController _waveController;
+
+  // WebRTC service for handling peer connections
+  final _webrtc = WebRTCService();
+  bool _remoteDescSet = false;
+  final List<RTCIceCandidate> _pendingCandidates = [];
 
   @override
   void initState() {
@@ -57,7 +64,7 @@ class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderSt
     if (widget.isOutgoing) {
       _placeCall();
     } else {
-      _acceptCall();
+      _setupSignaling();
     }
   }
 
@@ -68,51 +75,159 @@ class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderSt
     _callSub?.cancel();
     _pulseController.dispose();
     _waveController.dispose();
+    _webrtc.dispose();
     super.dispose();
   }
 
-  void _placeCall() {
+  Future<void> _setupSignaling() async {
     final myUid = context.read<AuthProvider>().firebaseUser!.uid;
-    final myName = context.read<AuthProvider>().userModel?.name ?? 'User';
 
-    // Place call in Firebase
-    FirebaseDatabase.instance.ref('audio_calls').child(widget.partnerUid).set({
-      'callerId': myUid,
-      'callerName': myName,
-      'type': 'audio',
-      'timestamp': ServerValue.timestamp,
-    });
+    _webrtc.onRemoteStream = (stream) {
+      if (mounted) setState(() => _isConnected = true);
+      _onCallConnected();
+    };
+
+    _webrtc.onIceCandidate = (candidate) {
+      FirebaseDatabase.instance
+          .ref('audio_calls_ice')
+          .child(widget.partnerUid)
+          .child(myUid)
+          .push()
+          .set({
+            'candidate': candidate.candidate,
+            'sdpMid': candidate.sdpMid,
+            'sdpMLineIndex': candidate.sdpMLineIndex,
+          });
+    };
+
+    await _webrtc.initLocalStream();
+    // Disable camera for audio call
+    _webrtc.toggleCamera();
+
+    await _webrtc.initializePeerConnection();
+
+    // Listen for ICE candidates
+    FirebaseDatabase.instance
+        .ref('audio_calls_ice')
+        .child(myUid)
+        .child(widget.partnerUid)
+        .onChildAdded
+        .listen((event) {
+          if (event.snapshot.value != null) {
+            final data = Map<dynamic, dynamic>.from(
+              event.snapshot.value as Map,
+            );
+            final candidate = RTCIceCandidate(
+              data['candidate'] as String?,
+              data['sdpMid'] as String?,
+              data['sdpMLineIndex'] as int?,
+            );
+            if (_remoteDescSet) {
+              _webrtc.addIceCandidate(candidate);
+            } else {
+              _pendingCandidates.add(candidate);
+            }
+          }
+        });
+  }
+
+  void _placeCall() async {
+    final auth = context.read<AuthProvider>();
+    final myUid = auth.firebaseUser!.uid;
+    final myName = auth.userModel?.name ?? 'User';
+
+    await _setupSignaling();
+    // Send direct call signal to the partner's device (widget.partnerUid)
+    // Ensure we are not sending the signal to our own UID which caused the glitch.
+    // Send direct call signal to the partner's device (widget.partnerUid)
+    // Include caller information for the incoming call UI.
+    await FirebaseDatabase.instance
+        .ref('direct_calls')
+        .child(widget.partnerUid)
+        .set({
+          'callerId': myUid,
+          'callerName': myName,
+          'callerAvatar': auth.userModel?.avatarUrl ?? '',
+          'type': 'audio',
+          'timestamp': ServerValue.timestamp,
+        });
+
+    // Create offer
+    final offer = await _webrtc.createOffer();
+    await FirebaseDatabase.instance
+        .ref('audio_calls')
+        .child(widget.partnerUid)
+        .set({
+          'callerId': myUid,
+          'sdp': offer.sdp,
+          'type': offer.type,
+          'timestamp': ServerValue.timestamp,
+        });
 
     // Listen for answer
     _callSub = FirebaseDatabase.instance
         .ref('audio_calls_active')
-        .child('${myUid}_${widget.partnerUid}')
+        .child(myUid)
+        .child(widget.partnerUid)
         .onValue
-        .listen((event) {
-      if (event.snapshot.value != null) {
-        _onCallConnected();
-      }
-    });
+        .listen((event) async {
+          if (event.snapshot.value != null) {
+            final data = Map<dynamic, dynamic>.from(
+              event.snapshot.value as Map,
+            );
+            if (data['sdp'] != null && !_remoteDescSet) {
+              final answer = RTCSessionDescription(data['sdp'], data['type']);
+              await _webrtc.setRemoteDescription(answer);
+              _remoteDescSet = true;
+              for (var c in _pendingCandidates) {
+                _webrtc.addIceCandidate(c);
+              }
+              _pendingCandidates.clear();
+            }
+          }
+        });
 
-    // Auto-end after 1 minute if no answer
     _ringTimer = Timer(const Duration(minutes: 1), () {
       if (!_isConnected && mounted) _endCall(missed: true);
     });
   }
 
-  void _acceptCall() {
+  void _acceptCall() async {
     final myUid = context.read<AuthProvider>().firebaseUser!.uid;
-    // Mark call as accepted
-    FirebaseDatabase.instance
-        .ref('audio_calls_active')
-        .child('${widget.partnerUid}_$myUid')
-        .set({'accepted': true, 'timestamp': ServerValue.timestamp});
-    _onCallConnected();
+
+    await _setupSignaling();
+
+    // Fetch offer
+    final snap = await FirebaseDatabase.instance
+        .ref('audio_calls')
+        .child(myUid)
+        .get();
+    if (snap.exists) {
+      final data = Map<dynamic, dynamic>.from(snap.value as Map);
+      final offer = RTCSessionDescription(data['sdp'], data['type']);
+      await _webrtc.setRemoteDescription(offer);
+      _remoteDescSet = true;
+      for (var c in _pendingCandidates) {
+        _webrtc.addIceCandidate(c);
+      }
+      _pendingCandidates.clear();
+
+      // Create answer
+      final answer = await _webrtc.createAnswer();
+      await FirebaseDatabase.instance
+          .ref('audio_calls_active')
+          .child(data['callerId'])
+          .child(myUid)
+          .set({
+            'sdp': answer.sdp,
+            'type': answer.type,
+            'timestamp': ServerValue.timestamp,
+          });
+    }
   }
 
   void _onCallConnected() {
     if (!mounted) return;
-    setState(() => _isConnected = true);
     _ringTimer?.cancel();
     _callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) setState(() => _callSeconds++);
@@ -127,20 +242,29 @@ class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderSt
     final myUid = context.read<AuthProvider>().firebaseUser!.uid;
 
     // Clean up Firebase
-    await FirebaseDatabase.instance.ref('audio_calls').child(widget.partnerUid).remove();
+    await FirebaseDatabase.instance
+        .ref('audio_calls')
+        .child(widget.partnerUid)
+        .remove();
     await FirebaseDatabase.instance.ref('audio_calls').child(myUid).remove();
-    await FirebaseDatabase.instance.ref('audio_calls_active').child('${myUid}_${widget.partnerUid}').remove();
-    await FirebaseDatabase.instance.ref('audio_calls_active').child('${widget.partnerUid}_$myUid').remove();
+    await FirebaseDatabase.instance
+        .ref('audio_calls_active')
+        .child('${myUid}_${widget.partnerUid}')
+        .remove();
+    await FirebaseDatabase.instance
+        .ref('audio_calls_active')
+        .child('${widget.partnerUid}_$myUid')
+        .remove();
 
     // Save call event in chat
     final chatService = ChatService();
     final chatId = chatService.getChatId(myUid, widget.partnerUid);
     final duration = _formatDuration(_callSeconds);
-    final callMsg = MessageModel(
+    final callMsg = msg_model.MessageModel(
       id: '',
       senderId: myUid,
       text: missed ? '📞 Missed audio call' : '📞 Audio call · $duration',
-      type: MessageType.callEvent,
+      type: msg_model.MessageType.callEvent,
       timestamp: DateTime.now(),
     );
     await chatService.sendMessage(chatId, callMsg);
@@ -159,7 +283,9 @@ class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderSt
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF5F5F5),
+      backgroundColor: isDark
+          ? const Color(0xFF0A0A0A)
+          : const Color(0xFFF5F5F5),
       body: SafeArea(
         child: Column(
           children: [
@@ -171,7 +297,7 @@ class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderSt
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: Image.asset('logo1.png', width: 20, height: 20),
+                  child: Image.asset('logo.png', width: 20, height: 20),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -231,7 +357,9 @@ class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderSt
                   : (widget.isOutgoing ? 'Calling...' : 'Incoming audio call'),
               style: TextStyle(
                 fontSize: 16,
-                color: _isConnected ? AppColors.success : AppColors.textSecondary,
+                color: _isConnected
+                    ? AppColors.success
+                    : AppColors.textSecondary,
                 fontWeight: _isConnected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -248,57 +376,61 @@ class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderSt
             // Controls
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: _isConnected 
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // Mute
-                      _buildControlBtn(
-                        icon: _isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-                        label: _isMuted ? 'Unmute' : 'Mute',
-                        active: _isMuted,
-                        onTap: () => setState(() => _isMuted = !_isMuted),
-                      ),
+              child: _isConnected
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // Mute
+                        _buildControlBtn(
+                          icon: _isMuted
+                              ? Icons.mic_off_rounded
+                              : Icons.mic_rounded,
+                          label: _isMuted ? 'Unmute' : 'Mute',
+                          active: _isMuted,
+                          onTap: () => setState(() => _isMuted = !_isMuted),
+                        ),
 
-                      // End call
-                      _buildCallBtn(
-                        icon: Icons.call_end_rounded,
-                        color: AppColors.error,
-                        onTap: () => _endCall(),
-                        shake: false,
-                      ),
+                        // End call
+                        _buildCallBtn(
+                          icon: Icons.call_end_rounded,
+                          color: AppColors.error,
+                          onTap: () => _endCall(),
+                          shake: false,
+                        ),
 
-                      // Speaker
-                      _buildControlBtn(
-                        icon: _isSpeaker ? Icons.volume_up_rounded : Icons.volume_down_rounded,
-                        label: 'Speaker',
-                        active: _isSpeaker,
-                        onTap: () => setState(() => _isSpeaker = !_isSpeaker),
-                      ),
-                    ],
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // Reject
-                      _buildCallBtn(
-                        icon: Icons.close_rounded,
-                        color: Colors.grey[700]!,
-                        onTap: () => _endCall(),
-                        shake: false,
-                      ),
-                      
-                      const SizedBox(width: 40),
+                        // Speaker
+                        _buildControlBtn(
+                          icon: _isSpeaker
+                              ? Icons.volume_up_rounded
+                              : Icons.volume_down_rounded,
+                          label: 'Speaker',
+                          active: _isSpeaker,
+                          onTap: () => setState(() => _isSpeaker = !_isSpeaker),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // Reject
+                        _buildCallBtn(
+                          icon: Icons.close_rounded,
+                          color: Colors.grey[700]!,
+                          onTap: () => _endCall(),
+                          shake: false,
+                        ),
 
-                      // Accept (Shake animation)
-                      _buildCallBtn(
-                        icon: Icons.call_rounded,
-                        color: AppColors.success,
-                        onTap: () => _acceptCall(),
-                        shake: true,
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 40),
+
+                        // Accept (Shake animation)
+                        _buildCallBtn(
+                          icon: Icons.call_rounded,
+                          color: AppColors.success,
+                          onTap: () => _acceptCall(),
+                          shake: true,
+                        ),
+                      ],
+                    ),
             ),
 
             const SizedBox(height: 60),
@@ -370,12 +502,17 @@ class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderSt
           child: GestureDetector(
             onTap: onTap,
             child: Container(
-              width: 72, height: 72,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
                 boxShadow: [
-                  BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 16, spreadRadius: 2),
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    spreadRadius: 2,
+                  ),
                 ],
               ),
               child: Icon(icon, color: Colors.white, size: 32),
@@ -398,12 +535,19 @@ class _AudioCallScreenState extends State<AudioCallScreen> with TickerProviderSt
         GestureDetector(
           onTap: onTap,
           child: Container(
-            width: 56, height: 56,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              color: active ? Colors.white : Colors.white.withValues(alpha: 0.1),
+              color: active
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: active ? Colors.black : Colors.white, size: 26),
+            child: Icon(
+              icon,
+              color: active ? Colors.black : Colors.white,
+              size: 26,
+            ),
           ),
         ),
         const SizedBox(height: 8),

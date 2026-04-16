@@ -8,10 +8,34 @@ import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/avatar_widget.dart';
-import '../services/ad_manager.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final _nameCtrl = TextEditingController();
+  String _gender = 'Male';
+  bool _isEditing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = context.read<AuthProvider>().userModel;
+    if (user != null) {
+      _nameCtrl.text = user.name;
+      _gender = user.gender.isNotEmpty ? user.gender : 'Male';
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
@@ -39,6 +63,20 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _saveChanges() async {
+    final auth = context.read<AuthProvider>();
+    await auth.updateProfile(
+      name: _nameCtrl.text.trim(),
+      gender: _gender,
+    );
+    setState(() => _isEditing = false);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully!')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -53,6 +91,19 @@ class SettingsScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_ios_new),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          if (user != null)
+            TextButton(
+              onPressed: () {
+                if (_isEditing) {
+                  _saveChanges();
+                } else {
+                  setState(() => _isEditing = true);
+                }
+              },
+              child: Text(_isEditing ? 'SAVE' : 'EDIT', style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -79,12 +130,40 @@ class SettingsScreen extends StatelessWidget {
                   children: [
                     AvatarWidget(
                       name: user.name,
-                      avatarCode: user.avatarUrl,
+                      avatarCode: '', // Force empty so it shows initials
                       radius: 40,
+                      showFrame: false,
                     ),
                     const SizedBox(height: 16),
-                    Text(user.name, style: AppTypography.headlineMedium),
-                    const SizedBox(height: 4),
+                    if (_isEditing) ...[
+                       TextField(
+                         controller: _nameCtrl,
+                         decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
+                       ),
+                       const SizedBox(height: 16),
+                       Row(
+                         children: [
+                           const Text('Gender: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                           const SizedBox(width: 8),
+                           DropdownButton<String>(
+                             value: _gender,
+                             items: ['Male', 'Female', 'Other'].map((String value) {
+                               return DropdownMenuItem<String>(value: value, child: Text(value));
+                             }).toList(),
+                             onChanged: (v) {
+                               if (v != null) setState(() => _gender = v);
+                             },
+                           ),
+                         ],
+                       ),
+                    ] else ...[
+                      Text(user.name, style: AppTypography.headlineMedium),
+                      const SizedBox(height: 4),
+                      Text(user.gender, style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary)),
+                      const SizedBox(height: 12),
+                    ],
+                    
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -97,32 +176,6 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      auth.firebaseUser?.email ?? 'Google Linked Account',
-                      style: AppTypography.bodySmall.copyWith(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton.icon(
-                      onPressed: () {
-                        // Watch ad before changing profile
-                        AdManager.showRewardedAd(
-                          onComplete: () {
-                            context.push('/avatar-selection');
-                          },
-                          onFailed: (error) {
-                             // Even if ad fails, we allow for now but notify users
-                             ScaffoldMessenger.of(context).showSnackBar(
-                               SnackBar(content: Text('Watch ad failed: $error'), backgroundColor: AppColors.error),
-                             );
-                             context.push('/avatar-selection');
-                          },
-                        );
-                      },
-                      icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
-                      label: const Text('Watch Ad to Change Profile'),
-                      style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-                    ),
-                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -156,6 +209,23 @@ class SettingsScreen extends StatelessWidget {
                 activeThumbColor: AppColors.primary,
                 onChanged: (val) => themeProv.toggleTheme(val),
               ),
+            ),
+            const Divider(height: 32),
+            
+            // Blocked Users
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.block_rounded, color: AppColors.error),
+              ),
+              title: const Text('Blocked Users', style: TextStyle(fontWeight: FontWeight.w600)),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.push('/blocked-users'),
             ),
             const Divider(height: 32),
             

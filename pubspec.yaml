@@ -14,6 +14,7 @@ dependencies:
   firebase_core: ^3.13.0
   firebase_auth: ^5.5.3
   firebase_database: ^11.3.5
+  firebase_messaging: ^15.2.10
 
   # Google Sign In
   google_sign_in: ^6.2.1
@@ -64,14 +65,14 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
 
-  flutter_launcher_icons:
-    android: "ic_launcher"
-    ios: true
-    image_path: "icon.png"
-    min_sdk_android: 21
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "icon.png"
+  min_sdk_android: 21
 
-  flutter:
-    uses-material-design: true
-    assets:
-      - logo.png
-      - icon.png
+flutter:
+  uses-material-design: true
+  assets:
+    - logo.png
+    - icon.png

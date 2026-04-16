@@ -25,9 +25,11 @@ class _AuthScreenState extends State<AuthScreen>
   final _loginEmailCtrl = TextEditingController();
   final _loginPasswordCtrl = TextEditingController();
   final _signUpNameCtrl = TextEditingController();
+  final _signUpAgeCtrl = TextEditingController();
   final _signUpEmailCtrl = TextEditingController();
   final _signUpPasswordCtrl = TextEditingController();
   final _signUpConfirmCtrl = TextEditingController();
+  String _selectedGender = 'Male';
 
   @override
   void initState() {
@@ -44,6 +46,7 @@ class _AuthScreenState extends State<AuthScreen>
     _loginEmailCtrl.dispose();
     _loginPasswordCtrl.dispose();
     _signUpNameCtrl.dispose();
+    _signUpAgeCtrl.dispose();
     _signUpEmailCtrl.dispose();
     _signUpPasswordCtrl.dispose();
     _signUpConfirmCtrl.dispose();
@@ -70,6 +73,8 @@ class _AuthScreenState extends State<AuthScreen>
         name: _signUpNameCtrl.text.trim(),
         email: _signUpEmailCtrl.text.trim(),
         password: _signUpPasswordCtrl.text,
+        age: _signUpAgeCtrl.text.trim(),
+        gender: _selectedGender,
       );
       if (!success && mounted) {
         _showError(auth.error ?? 'Sign up failed');
@@ -79,13 +84,7 @@ class _AuthScreenState extends State<AuthScreen>
 
 
 
-  void _onGoogleSignIn() async {
-    final auth = context.read<AuthProvider>();
-    final success = await auth.signInWithGoogle();
-    if (!success && mounted) {
-      _showError(auth.error ?? 'Google sign in failed');
-    }
-  }
+
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -197,7 +196,7 @@ class _AuthScreenState extends State<AuthScreen>
                         // LOGO
                         Center(
                           child: Image.asset(
-                            'logo1.png', 
+                            'logo.png', 
                             height: 120, 
                             fit: BoxFit.contain
                           ),
@@ -327,45 +326,12 @@ class _AuthScreenState extends State<AuthScreen>
             height: 56,
             onPressed: _onLogin,
           ),
-          const SizedBox(height: 24),
-          _buildSocialDivider(isDark),
-          const SizedBox(height: 24),
-          _buildGoogleButton(isDark),
         ],
       ),
     );
   }
 
-  Widget _buildSocialDivider(bool isDark) {
-    return Row(
-      children: [
-        Expanded(child: Divider(color: isDark ? Colors.grey[800] : Colors.grey[300])),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text('OR', style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary)),
-        ),
-        Expanded(child: Divider(color: isDark ? Colors.grey[800] : Colors.grey[300])),
-      ],
-    );
-  }
 
-  Widget _buildGoogleButton(bool isDark) {
-    return OutlinedButton.icon(
-      onPressed: _onGoogleSignIn,
-      icon: Image.network(
-        'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg', 
-        height: 24,
-        errorBuilder: (context, error, stackTrace) => const Icon(Icons.g_mobiledata_rounded, size: 24),
-      ),
-      label: const Text('Continue with Google', style: TextStyle(fontWeight: FontWeight.w600)),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: isDark ? Colors.white : Colors.black87,
-        minimumSize: const Size(double.infinity, 56),
-        side: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusL)),
-      ),
-    );
-  }
 
   Widget _buildSignUpForm(bool isDark) {
     return Form(
@@ -378,6 +344,22 @@ class _AuthScreenState extends State<AuthScreen>
             prefixIcon: Icons.person_outline,
             controller: _signUpNameCtrl,
             validator: Validators.name,
+          ),
+          const SizedBox(height: 14),
+          CustomTextField(
+            hintText: 'Age',
+            prefixIcon: Icons.cake_outlined,
+            controller: _signUpAgeCtrl,
+            keyboardType: TextInputType.number,
+            validator: (v) => v == null || v.isEmpty ? 'Please enter your age' : null,
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _buildGenderChoice('Male', Icons.male)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildGenderChoice('Female', Icons.female)),
+            ],
           ),
           const SizedBox(height: 14),
           CustomTextField(
@@ -410,11 +392,41 @@ class _AuthScreenState extends State<AuthScreen>
             height: 56,
             onPressed: _onSignUp,
           ),
-          const SizedBox(height: 24),
-          _buildSocialDivider(isDark),
-          const SizedBox(height: 24),
-          _buildGoogleButton(isDark),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGenderChoice(String title, IconData icon) {
+    final isSelected = _selectedGender == title;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return GestureDetector(
+      onTap: () => setState(() => _selectedGender = title),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : (isDark ? const Color(0xFF2A2A2A) : AppColors.backgroundSecondary),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: isSelected ? Colors.white : AppColors.textSecondary, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: AppTypography.button.copyWith(
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
