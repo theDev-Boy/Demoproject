@@ -225,3 +225,10 @@ Chat List	Firestore chats collection	StreamBuilder listening to chats ordered by
 Friends List	Firestore friends subcollection	StreamBuilder listening to friends with status changes.
 Requests Page	Firestore requests collection	StreamBuilder listening to incoming requests where status == 'pending'.
 UI Note: Add a silent refresh (no spinning wheel in center of screen, just updating the list). Optionally add a Pull-to-Refresh for manual override, but auto-refresh is mandatory.
+
+
+
+
+
+
+okay, bro please i am getting few issue bro 1 please when i open my app its not navigating to the min page its stuk just white screen please fix now! and another issue is please fix this bro use icon.png as app icon okay appp icon oky and whic logo i prvided okay use that logo.png as a logo everywhare okay in the app please quickly please fix this or update this!

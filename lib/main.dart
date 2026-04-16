@@ -13,12 +13,8 @@ import 'services/ad_service.dart';
 import 'services/ad_manager.dart';
 import 'services/call_notification_service.dart';
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Notifications
-  await CallNotificationService().init();
 
   // Initialize Firebase with explicit options for Android
   await Firebase.initializeApp(
@@ -31,6 +27,9 @@ void main() async {
       storageBucket: FirebaseConfig.storageBucket,
     ),
   );
+
+  // Initialize Notifications
+  await CallNotificationService().init();
 
   // Set preferred orientation
   await SystemChrome.setPreferredOrientations([
@@ -51,7 +50,6 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-
       ],
       child: const ZuumeetApp(),
     ),
