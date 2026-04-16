@@ -196,7 +196,7 @@ class _AuthScreenState extends State<AuthScreen>
                         // LOGO
                         Center(
                           child: Image.asset(
-                            'logo.png', 
+                            'new_logo.png', 
                             height: 120, 
                             fit: BoxFit.contain
                           ),

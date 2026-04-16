@@ -297,7 +297,7 @@ class _AudioCallScreenState extends State<AudioCallScreen>
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: Image.asset('logo.png', width: 20, height: 20),
+                  child: Image.asset('new_logo.png', width: 20, height: 20),
                 ),
                 const SizedBox(width: 8),
                 Text(

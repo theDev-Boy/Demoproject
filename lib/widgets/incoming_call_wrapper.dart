@@ -195,7 +195,11 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper>
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.asset('logo.png', width: 24, height: 24),
+                          child: Image.asset(
+                            'new_logo.png',
+                            width: 24,
+                            height: 24,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         const Text(

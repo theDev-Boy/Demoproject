@@ -196,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Column(
                     children: [
                       Image.asset(
-                        'logo.png',
+                        'new_logo.png',
                         width: screenW < 360 ? 100 : 140,
                         height: screenW < 360 ? 100 : 140,
                       ),
