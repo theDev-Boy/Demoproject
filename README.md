@@ -232,3 +232,380 @@ UI Note: Add a silent refresh (no spinning wheel in center of screen, just updat
 
 
 okay, bro please i am getting few issue bro 1 please when i open my app its not navigating to the min page its stuk just white screen please fix now! and another issue is please fix this bro use icon.png as app icon okay appp icon oky and whic logo i prvided okay use that logo.png as a logo everywhare okay in the app please quickly please fix this or update this!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SWITCH FROM WEBRTC TO AGORA SDK (CRITICAL)
+1.1 Reason for Change
+Current WebRTC implementation is failing (no audio/video transmission). Migrate entirely to Agora SDK for reliability.
+
+1.2 Agora Integration Code (Use Exactly This Pattern)
+dart
+import 'package:agora_uikit/agora_uikit.dart';
+
+final AgoraClient client = AgoraClient(
+  agoraConnectionData: AgoraConnectionData(
+    appId: "e7f6e9aeecf14b2ba10e3f40be9f56e7",
+    channelName: "test", // DYNAMIC: Use roomId from database
+    tempToken: token,    // GENERATE: From your backend server
+  ),
+  enabledPermission: [
+    Permission.camera,
+    Permission.microphone,
+  ],
+);
+
+@override
+void initState() {
+  super.initState();
+  initAgora();
+}
+
+void initAgora() async {
+  await client.initialize();
+}
+1.3 Token Generation (Backend Requirement)
+IMPORTANT: Agora requires a token for secure channels.
+
+Task: Create a Cloud Function (Firebase) or simple Node.js endpoint that generates an Agora RTC Token using the appId and appCertificate.
+
+Flutter Side: Before joining call, fetch token from your backend.
+
+1.4 Feature Parity with Agora
+Video Call: Use AgoraVideoViewer and AgoraVideoButtons.
+
+Audio Call: Set videoEnabled: false in connection data.
+
+Voice Messages: USE AGORA RECORDING SDK or use simple flutter_sound + just_audio for voice messages. Do not use Agora for voice messages - use local recording and file upload (more reliable for async messages).
+
+PART 2: REAL VOICE MESSAGE IMPLEMENTATION
+2.1 Requirements
+Not fake UI. Must record actual audio and send the file.
+
+Library: Use record: ^5.0.0 and audioplayers: ^5.2.0.
+
+2.2 Workflow
+Long Press: Start recording with AudioRecorder.
+
+Hold: Show duration timer and waveform visualization.
+
+Release: Stop recording, encode to .m4a or .aac.
+
+Upload: Upload file to Firebase Storage.
+
+Send: Save download URL in Firestore message document.
+
+Playback: Use AudioPlayer to stream from URL.
+
+2.3 UI Requirements for Voice Message Bubble
+Display: 🎤 Icon + Duration (e.g., 0:42).
+
+Play/Pause button with waveform animation while playing.
+
+Seek bar to scrub through audio.
+
+PART 3: INCOMING CALL UI (iOS STYLE) - BOTH FOREGROUND & BACKGROUND
+3.1 Visual Reference (Based on Your Image)
+You described/sent:
+
+Full screen background image/blur.
+
+Name: John Doe centered.
+
+Status text: "Incoming call" or "Calling..." or "Ringing...".
+
+Bottom buttons: End Call (Red) and Pick Up (Green).
+
+3.2 Status Text Logic (Dynamic)
+Scenario	Text Displayed	End Call Button	Pick Up Button
+Caller - Dialing user	"Calling..."	✅ Visible	❌ Hidden
+Receiver - App Open	"Incoming call"	✅ Visible	✅ Visible
+Receiver - Phone Ringing (Remote)	"Ringing..."	✅ Visible	❌ Hidden
+Connected (Audio)	Call Duration Timer	✅ Visible	❌ Hidden
+3.3 Swipe Animation & Gesture
+Pick Up: Swipe up on green button area OR tap button.
+
+End Call: Swipe down OR tap red button.
+
+Animation: Scale and fade transition similar to iOS native phone app.
+
+Library Suggestion: Use flutter_phone_direct_caller or custom AnimationController with SlideTransition.
+
+3.4 Call Connected Screen (Audio Call UI)
+Elements:
+
+Avatar of other user (large, centered).
+
+Name of user.
+
+Call Duration Timer (e.g., 02:34).
+
+Action Row:
+
+Speaker (Toggle)
+
+Mute (Toggle)
+
+Message (Navigates to Chat Screen with that user)
+
+End Call (Red button)
+
+3.5 Call Connected Screen (Video Call UI)
+Elements:
+
+Remote Video: Full screen AgoraVideoViewer (remote user).
+
+Local Video: Small draggable PIP window AgoraVideoViewer (local user).
+
+Action Row (Bottom):
+
+Mute Mic
+
+Switch Camera (Front/Back)
+
+Toggle Camera (Video On/Off)
+
+Message Icon (Navigates to Chat)
+
+End Call
+
+PART 4: BACKGROUND CALL NOTIFICATIONS (APP CLOSED/KILLED) - CRITICAL FIX
+4.1 Current Problem
+When app is closed, no incoming call screen appears.
+
+4.2 Solution: Full-Screen Intent with FCM & CallKeep
+Android Steps:
+
+FCM Data Message: Server sends a high priority data payload (as described in previous PRD).
+
+Background Handler: In firebase_messaging_background_handler, call a method to launch a Full-Screen Activity.
+
+Full-Screen Activity: Create CallActivity.kt (Android Native) or use flutter_callkeep / callkeep package to invoke native incoming call UI.
+
+Permission: Add SYSTEM_ALERT_WINDOW and USE_FULL_SCREEN_INTENT in manifest.
+
+iOS Steps:
+
+Use CallKit (integrated via flutter_callkeep).
+
+Use VoIP Push Notifications (not standard FCM) for reliable waking.
+
+Ensure Background Modes -> Voice over IP is checked.
+
+4.3 Expected Behavior
+User gets a full-screen ring screen (even when phone is locked/app is killed).
+
+User taps Accept -> App opens directly to the connected call screen (Agora).
+
+User taps Decline -> Notification dismissed, caller receives "Busy/Declined" status.
+
+PART 5: MESSAGING NOTIFICATIONS & CHAT LIST UPDATE
+5.1 Message Notifications (App Closed)
+Fix: Ensure AndroidNotificationChannel importance is set to Importance.high.
+
+Task: In FirebaseMessaging.onBackgroundMessage, call FlutterLocalNotificationsPlugin.show().
+
+Click Action: When user taps message notification, open app directly to that specific chat.
+
+5.2 Chat List Auto-Update
+Rule: When User A sends a message to User B (first time), the conversation should immediately appear in User A's Chat List without restarting app.
+
+Implementation: Use Firestore StreamBuilder on chats collection ordered by timestamp.
+
+PART 6: FINAL CHECKLIST FOR AI DEVELOPER
+Category	Task	Tech Stack
+Audio/Video Call	Replace WebRTC with Agora	agora_uikit
+Voice Message	Implement real recording & playback	record + audioplayers + Firebase Storage
+Call UI	Build iOS-style incoming/ongoing screens	Custom Widgets + Animations
+Background Call	FCM Data Message -> Full Screen Intent	callkeep + Native Code
+Notifications	Fix app closed behavior	firebase_messaging + flutter_local_notifications
+Chat Sync	Auto-refresh on all social pages	StreamBuilder
+
+
+add real backround call handling callkit and keepkit and detel and removed all files of webrtc and use agora every whareand base64 if working then okay bcz we have not storgae in freabse i am in free plan thats why i have not stiarge okay thats why fro now the base.. okay and please do this
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+t to re-enable it, run 'Import-Module PSReadLine'.
+
+
+PS C:\flutter_app_website\Hunt-yt\Demoproject\app> flutter analyze
+Analyzing app...                                                        
+
+   info - Use 'const' with the constructor to improve performance -
+          lib\screens\blocked_users_screen.dart:33:20 -
+          prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance -
+          lib\screens\blocked_users_screen.dart:33:42 -
+          prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\blocked_users_screen.dart:75:19 -
+          prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\blocked_users_screen.dart:75:51 -
+          prefer_const_constructors
+  error - The values in a const list literal must be constants -
+         lib\screens\call_screen.dart:210:19 - non_constant_list_element  
+  error - There's no constant named 'endCall' in 'BuiltInButtons' -       
+         lib\screens\call_screen.dart:210:34 - undefined_enum_constant    
+   info - Don't use 'BuildContext's across async gaps -
+          lib\screens\chat_screen.dart:199:19 -
+          use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps -
+          lib\screens\chat_screen.dart:208:7 -
+          use_build_context_synchronously
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\chat_screen.dart:299:42 - prefer_const_constructors 
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\chat_screen.dart:631:20 - prefer_const_constructors 
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\custom_avatar_screen.dart:170:20 -
+          prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\friends_screen.dart:461:33 -
+          prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\messenger_screen.dart:144:38 -
+          prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance -
+          lib\screens\messenger_screen.dart:216:18 -
+          prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\messenger_screen.dart:220:20 -
+          prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\messenger_screen.dart:220:42 -
+          prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\messenger_screen.dart:285:15 -
+          prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance -       
+          lib\screens\messenger_screen.dart:285:64 -
+          prefer_const_constructors
+   info - The imported package 'flutter_webrtc' isn't a dependency of the 
+          importing package - lib\services\webrtc_service.dart:2:8 -      
+          depend_on_referenced_packages
+  error - Target of URI doesn't exist:
+         'package:flutter_webrtc/flutter_webrtc.dart' -
+         lib\services\webrtc_service.dart:2:8 - uri_does_not_exist        
+  error - Undefined class 'MediaStream' -
+         lib\services\webrtc_service.dart:8:40 - undefined_class
+  error - Undefined class 'RTCPeerConnectionState' -
+         lib\services\webrtc_service.dart:9:49 - undefined_class
+  error - Undefined class 'RTCIceCandidate' -
+         lib\services\webrtc_service.dart:10:40 - undefined_class
+  error - Undefined class 'RTCPeerConnection' -
+         lib\services\webrtc_service.dart:20:3 - undefined_class
+  error - Undefined class 'MediaStream' -
+         lib\services\webrtc_service.dart:21:3 - undefined_class
+  error - Undefined class 'MediaStream' -
+         lib\services\webrtc_service.dart:22:3 - undefined_class
+  error - Undefined class 'MediaStream' -
+         lib\services\webrtc_service.dart:35:3 - undefined_class
+  error - Undefined class 'MediaStream' -
+         lib\services\webrtc_service.dart:36:3 - undefined_class
+  error - The name 'MediaStream' isn't a type, so it can't be used as a   
+         type argument - lib\services\webrtc_service.dart:80:10 -
+         non_type_as_type_argument
+  error - Undefined name 'navigator' -
+         lib\services\webrtc_service.dart:88:17 - undefined_identifier    
+  error - The method 'createPeerConnection' isn't defined for the type    
+         'WebRTCService' - lib\services\webrtc_service.dart:107:31 -      
+         undefined_method
+  error - Undefined name 'Helper' -
+         lib\services\webrtc_service.dart:110:13 - undefined_identifier   
+  error - The method 'RTCRtpTransceiverInit' isn't defined for the type   
+         'WebRTCService' - lib\services\webrtc_service.dart:115:35 -      
+         undefined_method
+  error - Undefined name 'TransceiverDirection' -
+         lib\services\webrtc_service.dart:116:24 - undefined_identifier   
+  error - Undefined class 'RTCTrackEvent' -
+         lib\services\webrtc_service.dart:127:35 - undefined_class        
+  error - Undefined class 'RTCIceCandidate' -
+         lib\services\webrtc_service.dart:136:42 - undefined_class        
+  error - Undefined class 'RTCIceGatheringState' -
+         lib\services\webrtc_service.dart:144:12 - undefined_class        
+  error - Undefined class 'RTCIceConnectionState' -
+         lib\services\webrtc_service.dart:150:12 - undefined_class        
+  error - Undefined name 'RTCIceConnectionState' -
+         lib\services\webrtc_service.dart:152:22 - undefined_identifier   
+  error - Undefined class 'RTCPeerConnectionState' -
+         lib\services\webrtc_service.dart:160:12 - undefined_class        
+  error - The name 'RTCSessionDescription' isn't a type, so it can't be
+         used as a type argument - lib\services\webrtc_service.dart:177:10         - non_type_as_type_argument
+  error - The method 'RTCSessionDescription' isn't defined for the type   
+         'WebRTCService' - lib\services\webrtc_service.dart:188:26 -      
+         undefined_method
+  error - The name 'RTCSessionDescription' isn't a type, so it can't be   
+         used as a type argument - lib\services\webrtc_service.dart:195:10         - non_type_as_type_argument
+  error - The method 'RTCSessionDescription' isn't defined for the type   
+         'WebRTCService' - lib\services\webrtc_service.dart:203:27 -      
+         undefined_method
+  error - Undefined class 'RTCSessionDescription' -
+         lib\services\webrtc_service.dart:265:37 - undefined_class        
+  error - Undefined class 'RTCIceCandidate' -
+         lib\services\webrtc_service.dart:271:32 - undefined_class        
+  error - Undefined name 'Helper' -
+         lib\services\webrtc_service.dart:309:13 - undefined_identifier   
+   info - Use 'const' with the constructor to improve performance -       
+          lib\widgets\custom_button.dart:44:23 - prefer_const_constructors   info - Use 'const' with the constructor to improve performance -       
+          lib\widgets\offline_wrapper.dart:62:26 -
+          prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of
+          '@immutable' classes - lib\widgets\offline_wrapper.dart:63:31 - 
+          prefer_const_literals_to_create_immutables
+   info - The imported package 'flutter_webrtc' isn't a dependency of the 
+          importing package - lib\widgets\video_card.dart:2:8 -
+          depend_on_referenced_packages
+  error - Target of URI doesn't exist:
+         'package:flutter_webrtc/flutter_webrtc.dart' -
+         lib\widgets\video_card.dart:2:8 - uri_does_not_exist
+  error - Undefined class 'RTCVideoRenderer' -
+         lib\widgets\video_card.dart:6:9 - undefined_class
+  error - The method 'RTCVideoView' isn't defined for the type 'VideoCard'         - lib\widgets\video_card.dart:35:16 - undefined_method
+  error - Undefined name 'RTCVideoViewObjectFit' -
+         lib\widgets\video_card.dart:38:22 - undefined_identifier
+
+55 issues found. (ran in 291.5s)
+PS C:\flutter_app_website\Hunt-yt\Demoproject\app> 

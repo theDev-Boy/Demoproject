@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import '../services/call_notification_service.dart';
 import '../services/database_service.dart';
 import '../utils/logger.dart';
 
@@ -41,6 +42,7 @@ class AuthProvider extends ChangeNotifier {
         await _loadUserModel(user.uid);
         _databaseService.setupPresence(user.uid);
         await _databaseService.setOnlineStatus(user.uid, true);
+        await CallNotificationService().registerCurrentUser(user.uid);
       } else {
         _userModel = null;
       }

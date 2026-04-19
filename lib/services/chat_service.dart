@@ -15,12 +15,28 @@ class ChatService {
   Future<void> sendMessage(String chatId, MessageModel message) async {
     final msgData = message.toMap();
     await _db.child('chats').child(chatId).child('messages').push().set(msgData);
-    
-    // Update last message in the chat metadata
-    await _db.child('chats_meta').child(chatId).update({
-      'lastMessage': message.text,
+    final participants = chatId.split('_');
+    final metaRef = _db.child('chats_meta').child(chatId);
+    final metaSnapshot = await metaRef.get();
+    final currentMeta = metaSnapshot.value is Map
+        ? Map<dynamic, dynamic>.from(metaSnapshot.value as Map)
+        : const <dynamic, dynamic>{};
+    final existingUnread = currentMeta['unreadCounts'] is Map
+        ? Map<String, dynamic>.from(currentMeta['unreadCounts'] as Map)
+        : <String, dynamic>{};
+    final unreadCounts = <String, int>{};
+    for (final uid in participants) {
+      final currentCount = (existingUnread[uid] as num?)?.toInt() ?? 0;
+      unreadCounts[uid] = uid == message.senderId ? 0 : currentCount + 1;
+    }
+    final lastMessage =
+        message.type == MessageType.voice ? 'Voice message' : message.text;
+
+    await metaRef.update({
+      'lastMessage': lastMessage,
       'lastMessageTime': message.timestamp.millisecondsSinceEpoch,
-      'participants': message.deletedFor, // Temp use participants field if needed, but better to keep it clean
+      'participants': participants,
+      'unreadCounts': unreadCounts,
     });
   }
 

@@ -8,6 +8,10 @@ class MessageModel {
   final DateTime timestamp;
   final bool isEdited;
   final List<String> deletedFor;
+  final String? voiceBase64;
+  final String? voiceMimeType;
+  final int? voiceDurationMs;
+  final int? voiceSizeBytes;
 
   MessageModel({
     required this.id,
@@ -17,6 +21,10 @@ class MessageModel {
     required this.timestamp,
     this.isEdited = false,
     this.deletedFor = const [],
+    this.voiceBase64,
+    this.voiceMimeType,
+    this.voiceDurationMs,
+    this.voiceSizeBytes,
   });
 
   Map<String, dynamic> toMap() {
@@ -28,6 +36,10 @@ class MessageModel {
       'timestamp': timestamp.millisecondsSinceEpoch,
       'isEdited': isEdited,
       'deletedFor': deletedFor,
+      'voiceBase64': voiceBase64,
+      'voiceMimeType': voiceMimeType,
+      'voiceDurationMs': voiceDurationMs,
+      'voiceSizeBytes': voiceSizeBytes,
     };
   }
 
@@ -43,6 +55,10 @@ class MessageModel {
       timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp'] ?? 0),
       isEdited: map['isEdited'] ?? false,
       deletedFor: List<String>.from(map['deletedFor'] ?? []),
+      voiceBase64: map['voiceBase64'] as String?,
+      voiceMimeType: map['voiceMimeType'] as String?,
+      voiceDurationMs: map['voiceDurationMs'] as int?,
+      voiceSizeBytes: map['voiceSizeBytes'] as int?,
     );
   }
 }

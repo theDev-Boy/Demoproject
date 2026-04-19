@@ -457,8 +457,8 @@ class _DiscoveryModalState extends State<_DiscoveryModal> {
                   children: [
                     Text(_foundUser!.name, style: AppTypography.headlineSmall.copyWith(fontSize: 20)),
                     const SizedBox(height: 4),
-                    Text(_foundUser!.country.isNotEmpty ? _foundUser!.country : 'Zuumeet User', 
-                         style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                     Text(_foundUser!.country.isNotEmpty ? _foundUser!.country : 'Zuumeet User', 
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                   ],
                 ),
               ),

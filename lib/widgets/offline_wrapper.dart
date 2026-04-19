@@ -59,11 +59,11 @@ class _OfflineWrapperState extends State<OfflineWrapper> {
                       BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 2))
                     ],
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 20),
-                      const SizedBox(width: 12),
-                      const Expanded(
+                      Icon(Icons.wifi_off_rounded, color: Colors.white, size: 20),
+                      SizedBox(width: 12),
+                      Expanded(
                         child: Text(
                           'Waiting for network...',
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),

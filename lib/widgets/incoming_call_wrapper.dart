@@ -9,6 +9,7 @@ import 'package:vibration/vibration.dart';
 import '../providers/auth_provider.dart';
 import '../config/app_colors.dart';
 import '../config/app_typography.dart';
+import '../services/database_service.dart';
 import '../widgets/avatar_widget.dart';
 
 class IncomingCallWrapper extends StatefulWidget {
@@ -23,6 +24,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper>
     with TickerProviderStateMixin {
   StreamSubscription? _callSub;
   Map<dynamic, dynamic>? _incomingCall;
+  String _status = 'Incoming call';
 
   late AnimationController _pulseController;
   late AnimationController _buttonController;
@@ -105,6 +107,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper>
             if (data['callerId'] == auth.firebaseUser?.uid) return;
 
             if (_incomingCall == null) {
+              _status = 'Incoming call';
               _startRinging();
               // Auto end after 1 minute
               _autoEndTimer?.cancel();
@@ -137,14 +140,23 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper>
     final myUid = auth.firebaseUser!.uid;
 
     try {
-      final callType = callData['type'] as String? ?? 'video';
-      await FirebaseDatabase.instance.ref('direct_calls').child(myUid).remove();
+      final callType = callData['callType'] as String? ?? 'video';
+      final matchId = callData['matchId'] as String? ?? '';
+      final channelName = callData['channelName'] as String? ?? matchId;
+      if (matchId.isNotEmpty) {
+        await DatabaseService().acceptDirectCall(myUid: myUid, matchId: matchId);
+      } else {
+        await FirebaseDatabase.instance.ref('direct_calls').child(myUid).remove();
+      }
 
       if (mounted) {
         if (callType == 'audio') {
           context.push(
             '/audio-call',
             extra: {
+              'callId': callData['callId'] as String? ?? matchId,
+              'matchId': matchId,
+              'channelName': channelName,
               'partnerUid': callerId,
               'partnerName': callerName,
               'partnerAvatar': callData['callerAvatar'] as String? ?? '',
@@ -152,7 +164,18 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper>
             },
           );
         } else {
-          context.go('/call');
+          context.push(
+            '/video-call',
+            extra: {
+              'callId': callData['callId'] as String? ?? matchId,
+              'matchId': matchId,
+              'channelName': channelName,
+              'partnerUid': callerId,
+              'partnerName': callerName,
+              'partnerAvatar': callData['callerAvatar'] as String? ?? '',
+              'isOutgoing': false,
+            },
+          );
         }
       }
     } catch (e) {
@@ -165,10 +188,19 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper>
     _autoEndTimer?.cancel();
     final auth = context.read<AuthProvider>();
     if (auth.firebaseUser != null) {
-      await FirebaseDatabase.instance
-          .ref('direct_calls')
-          .child(auth.firebaseUser!.uid)
-          .remove();
+      final matchId = _incomingCall?['matchId'] as String?;
+      if (matchId != null && matchId.isNotEmpty) {
+        await DatabaseService().rejectDirectCall(
+          myUid: auth.firebaseUser!.uid,
+          matchId: matchId,
+          status: 'declined',
+        );
+      } else {
+        await FirebaseDatabase.instance
+            .ref('direct_calls')
+            .child(auth.firebaseUser!.uid)
+            .remove();
+      }
     }
     setState(() => _incomingCall = null);
   }
@@ -251,7 +283,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Incoming calling...',
+                      _status,
                       style: AppTypography.bodyLarge.copyWith(
                         color: AppColors.textSecondary,
                         letterSpacing: 1.2,
@@ -324,8 +356,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper>
               offset: Offset(shake, -offset),
               child: GestureDetector(
                 onPanUpdate: (details) {
-                  // Swipe logic: if swiped up enough, trigger onTap
-                  if (details.delta.dy < -10) onTap();
+                  if (isAccept && details.delta.dy < -10) onTap();
+                  if (!isAccept && details.delta.dy > 10) onTap();
                 },
                 child: Container(
                   width: 72,

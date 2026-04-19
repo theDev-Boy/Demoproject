@@ -203,10 +203,6 @@ class DatabaseService {
         'status': 'ended',
         'endedAt': ServerValue.timestamp,
       });
-      // Clean up signaling sub-nodes from the match
-      await _db.ref(AppConstants.matchesPath).child(matchId).child('offer').remove();
-      await _db.ref(AppConstants.matchesPath).child(matchId).child('answer').remove();
-      await _db.ref(AppConstants.matchesPath).child(matchId).child('candidates').remove();
     } catch (e) {
       logger.e('Failed to end match', error: e);
     }
@@ -236,67 +232,87 @@ class DatabaseService {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // WEBRTC SIGNALING VIA FIREBASE
-  // ---------------------------------------------------------------------------
+  Future<Map<String, dynamic>> createDirectCall({
+    required UserModel caller,
+    required String calleeUid,
+    required String calleeName,
+    required String calleeAvatar,
+    required bool isVideo,
+  }) async {
+    final matchRef = _db.ref(AppConstants.matchesPath).push();
+    final matchId = matchRef.key!;
+    final channelParts = [caller.uid, calleeUid]..sort();
+    final channelName = channelParts.join('_');
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final callType = isVideo ? 'video' : 'audio';
 
-  /// Send WebRTC offer (SDP).
-  Future<void> sendOffer(String matchId, Map<String, dynamic> offer) async {
+    final matchData = {
+      'user1': caller.uid,
+      'user2': calleeUid,
+      'startedAt': now,
+      'status': 'ringing',
+      'initiator': caller.uid,
+      'user1Name': caller.name,
+      'user2Name': calleeName,
+      'callType': callType,
+      'channelName': channelName,
+      'isDirectCall': true,
+      'callerAvatar': caller.avatarUrl,
+      'calleeAvatar': calleeAvatar,
+    };
+
+    final callPayload = <String, dynamic>{
+      'type': 'call',
+      'callId': matchId,
+      'matchId': matchId,
+      'callType': callType,
+      'channelName': channelName,
+      'callerId': caller.uid,
+      'callerName': caller.name,
+      'callerAvatar': caller.avatarUrl,
+      'calleeUid': calleeUid,
+      'calleeName': calleeName,
+      'calleeAvatar': calleeAvatar,
+      'timestamp': now.toString(),
+    };
+
+    await matchRef.set(matchData);
     await _db
-        .ref(AppConstants.matchesPath)
-        .child(matchId)
-        .child('offer')
-        .set(offer);
+        .ref(AppConstants.directCallsPath)
+        .child(calleeUid)
+        .set(callPayload);
+
+    return callPayload;
   }
 
-  /// Send WebRTC answer (SDP).
-  Future<void> sendAnswer(String matchId, Map<String, dynamic> answer) async {
-    await _db
-        .ref(AppConstants.matchesPath)
-        .child(matchId)
-        .child('answer')
-        .set(answer);
+  Future<void> acceptDirectCall({
+    required String myUid,
+    required String matchId,
+  }) async {
+    await _db.ref(AppConstants.matchesPath).child(matchId).update({
+      'status': 'connected',
+      'answeredAt': ServerValue.timestamp,
+    });
+    await _db.ref(AppConstants.directCallsPath).child(myUid).remove();
   }
 
-  /// Send ICE candidate.
-  Future<void> sendIceCandidate(
-      String matchId, String senderUid, Map<String, dynamic> candidate) async {
-    await _db
-        .ref(AppConstants.matchesPath)
-        .child(matchId)
-        .child('candidates')
-        .child(senderUid)
-        .push()
-        .set(candidate);
+  Future<void> rejectDirectCall({
+    required String myUid,
+    required String matchId,
+    String status = 'declined',
+  }) async {
+    await _db.ref(AppConstants.matchesPath).child(matchId).update({
+      'status': status,
+      'endedAt': ServerValue.timestamp,
+    });
+    await _db.ref(AppConstants.directCallsPath).child(myUid).remove();
   }
 
-  /// Listen for WebRTC offer.
-  Stream<DatabaseEvent> listenForOffer(String matchId) {
-    return _db
-        .ref(AppConstants.matchesPath)
-        .child(matchId)
-        .child('offer')
-        .onValue;
-  }
-
-  /// Listen for WebRTC answer.
-  Stream<DatabaseEvent> listenForAnswer(String matchId) {
-    return _db
-        .ref(AppConstants.matchesPath)
-        .child(matchId)
-        .child('answer')
-        .onValue;
-  }
-
-  /// Listen for ICE candidates from remote peer.
-  Stream<DatabaseEvent> listenForCandidates(
-      String matchId, String remoteUid) {
-    return _db
-        .ref(AppConstants.matchesPath)
-        .child(matchId)
-        .child('candidates')
-        .child(remoteUid)
-        .onChildAdded;
+  Future<void> endDirectCall(String matchId) async {
+    await _db.ref(AppConstants.matchesPath).child(matchId).update({
+      'status': 'ended',
+      'endedAt': ServerValue.timestamp,
+    });
   }
 
   /// Listen for match status changes (e.g., partner ended call).

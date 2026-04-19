@@ -141,7 +141,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
                           children: [
                             Text(
                               _formatTime(chat.lastMessageTime),
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             ),
                             const SizedBox(height: 6),
                             if (chat.unreadCounts[myUid] != null && chat.unreadCounts[myUid]! > 0 && !isBlocked)
@@ -213,11 +213,11 @@ class _MessengerScreenState extends State<MessengerScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Clear Chat?', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('This will delete all messages in this chat from this device only. This action cannot be undone.'),
+        content: const Text('This will delete all messages in this chat from this device only. This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
             onPressed: () {
@@ -282,7 +282,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
               const SizedBox(height: 16),
               Text('New Chat', style: AppTypography.headlineMedium),
               const SizedBox(height: 4),
-              Text('Choose a friend to start chatting', style: TextStyle(color: AppColors.textSecondary)),
+              const Text('Choose a friend to start chatting', style: TextStyle(color: AppColors.textSecondary)),
               const SizedBox(height: 16),
               Expanded(
                 child: friends.isEmpty

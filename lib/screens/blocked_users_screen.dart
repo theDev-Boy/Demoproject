@@ -30,7 +30,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -72,7 +72,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                 children: [
                   Icon(Icons.block_rounded, size: 64, color: AppColors.textSecondary.withValues(alpha: 0.3)),
                   const SizedBox(height: 16),
-                  Text('No blocked users', style: TextStyle(fontSize: 18, color: AppColors.textSecondary)),
+                  const Text('No blocked users', style: TextStyle(fontSize: 18, color: AppColors.textSecondary)),
                 ],
               ),
             )

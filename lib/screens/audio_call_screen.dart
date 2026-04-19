@@ -1,25 +1,31 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:agora_uikit/agora_uikit.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:provider/provider.dart';
 import '../config/app_colors.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/avatar_widget.dart';
+import '../services/agora_token_service.dart';
+import '../services/call_notification_service.dart';
 import '../services/chat_service.dart';
-import '../models/message_model.dart' as msg_model;
-import '../services/webrtc_service.dart';
+import '../services/database_service.dart';
+import '../widgets/avatar_widget.dart';
 
 class AudioCallScreen extends StatefulWidget {
   final String partnerUid;
   final String partnerName;
   final String partnerAvatar;
+  final String callId;
+  final String matchId;
+  final String channelName;
   final bool isOutgoing;
 
   const AudioCallScreen({
     super.key,
+    required this.callId,
+    required this.matchId,
+    required this.channelName,
     required this.partnerUid,
     required this.partnerName,
     this.partnerAvatar = '',
@@ -38,15 +44,14 @@ class _AudioCallScreenState extends State<AudioCallScreen>
   int _callSeconds = 0;
   Timer? _callTimer;
   Timer? _ringTimer;
-  StreamSubscription? _callSub;
+  AgoraClient? _agoraClient;
+  final _tokenService = AgoraTokenService();
+  final _db = DatabaseService();
+  StreamSubscription? _statusSub;
+  String _statusText = 'Connecting...';
 
   late AnimationController _pulseController;
   late AnimationController _waveController;
-
-  // WebRTC service for handling peer connections
-  final _webrtc = WebRTCService();
-  bool _remoteDescSet = false;
-  final List<RTCIceCandidate> _pendingCandidates = [];
 
   @override
   void initState() {
@@ -61,215 +66,108 @@ class _AudioCallScreenState extends State<AudioCallScreen>
       duration: const Duration(milliseconds: 1200),
     )..repeat();
 
-    if (widget.isOutgoing) {
-      _placeCall();
-    } else {
-      _setupSignaling();
-    }
+    _statusText = widget.isOutgoing ? 'Calling...' : 'Connecting...';
+    _listenForStatusChanges();
+    _initAgoraAudio();
   }
 
   @override
   void dispose() {
     _callTimer?.cancel();
     _ringTimer?.cancel();
-    _callSub?.cancel();
+    _statusSub?.cancel();
     _pulseController.dispose();
     _waveController.dispose();
-    _webrtc.dispose();
+    _agoraClient?.engine.leaveChannel();
     super.dispose();
   }
 
-  Future<void> _setupSignaling() async {
-    final myUid = context.read<AuthProvider>().firebaseUser!.uid;
-
-    _webrtc.onRemoteStream = (stream) {
-      if (mounted) setState(() => _isConnected = true);
-      _onCallConnected();
-    };
-
-    _webrtc.onIceCandidate = (candidate) {
-      FirebaseDatabase.instance
-          .ref('audio_calls_ice')
-          .child(widget.partnerUid)
-          .child(myUid)
-          .push()
-          .set({
-            'candidate': candidate.candidate,
-            'sdpMid': candidate.sdpMid,
-            'sdpMLineIndex': candidate.sdpMLineIndex,
-          });
-    };
-
-    await _webrtc.initLocalStream();
-    // Disable camera for audio call
-    _webrtc.toggleCamera();
-
-    await _webrtc.initializePeerConnection();
-
-    // Listen for ICE candidates
-    FirebaseDatabase.instance
-        .ref('audio_calls_ice')
-        .child(myUid)
-        .child(widget.partnerUid)
-        .onChildAdded
-        .listen((event) {
-          if (event.snapshot.value != null) {
-            final data = Map<dynamic, dynamic>.from(
-              event.snapshot.value as Map,
-            );
-            final candidate = RTCIceCandidate(
-              data['candidate'] as String?,
-              data['sdpMid'] as String?,
-              data['sdpMLineIndex'] as int?,
-            );
-            if (_remoteDescSet) {
-              _webrtc.addIceCandidate(candidate);
-            } else {
-              _pendingCandidates.add(candidate);
-            }
-          }
-        });
-  }
-
-  void _placeCall() async {
-    final auth = context.read<AuthProvider>();
-    final myUid = auth.firebaseUser!.uid;
-    final myName = auth.userModel?.name ?? 'User';
-
-    await _setupSignaling();
-    // Send direct call signal to the partner's device (widget.partnerUid)
-    // Ensure we are not sending the signal to our own UID which caused the glitch.
-    // Send direct call signal to the partner's device (widget.partnerUid)
-    // Include caller information for the incoming call UI.
-    await FirebaseDatabase.instance
-        .ref('direct_calls')
-        .child(widget.partnerUid)
-        .set({
-          'callerId': myUid,
-          'callerName': myName,
-          'callerAvatar': auth.userModel?.avatarUrl ?? '',
-          'type': 'audio',
-          'timestamp': ServerValue.timestamp,
-        });
-
-    // Create offer
-    final offer = await _webrtc.createOffer();
-    await FirebaseDatabase.instance
-        .ref('audio_calls')
-        .child(widget.partnerUid)
-        .set({
-          'callerId': myUid,
-          'sdp': offer.sdp,
-          'type': offer.type,
-          'timestamp': ServerValue.timestamp,
-        });
-
-    // Listen for answer
-    _callSub = FirebaseDatabase.instance
-        .ref('audio_calls_active')
-        .child(myUid)
-        .child(widget.partnerUid)
-        .onValue
-        .listen((event) async {
-          if (event.snapshot.value != null) {
-            final data = Map<dynamic, dynamic>.from(
-              event.snapshot.value as Map,
-            );
-            if (data['sdp'] != null && !_remoteDescSet) {
-              final answer = RTCSessionDescription(data['sdp'], data['type']);
-              await _webrtc.setRemoteDescription(answer);
-              _remoteDescSet = true;
-              for (var c in _pendingCandidates) {
-                _webrtc.addIceCandidate(c);
-              }
-              _pendingCandidates.clear();
-            }
-          }
-        });
-
-    _ringTimer = Timer(const Duration(minutes: 1), () {
-      if (!_isConnected && mounted) _endCall(missed: true);
+  void _listenForStatusChanges() {
+    _statusSub = _db.listenForMatchStatus(widget.matchId).listen((event) {
+      if (!mounted || !event.snapshot.exists) return;
+      final status = event.snapshot.value as String?;
+      if (status == null) return;
+      if (status == 'declined' ||
+          status == 'ended' ||
+          status == 'missed' ||
+          status == 'no_answer') {
+        _endCall();
+      }
     });
   }
 
-  void _acceptCall() async {
-    final myUid = context.read<AuthProvider>().firebaseUser!.uid;
+  Future<void> _initAgoraAudio() async {
+    final auth = context.read<AuthProvider>();
+    final myUid = auth.firebaseUser!.uid;
+    final token = await _tokenService.fetchRtcToken(
+      channelName: widget.channelName,
+      uid: myUid,
+      videoEnabled: false,
+    );
 
-    await _setupSignaling();
-
-    // Fetch offer
-    final snap = await FirebaseDatabase.instance
-        .ref('audio_calls')
-        .child(myUid)
-        .get();
-    if (snap.exists) {
-      final data = Map<dynamic, dynamic>.from(snap.value as Map);
-      final offer = RTCSessionDescription(data['sdp'], data['type']);
-      await _webrtc.setRemoteDescription(offer);
-      _remoteDescSet = true;
-      for (var c in _pendingCandidates) {
-        _webrtc.addIceCandidate(c);
-      }
-      _pendingCandidates.clear();
-
-      // Create answer
-      final answer = await _webrtc.createAnswer();
-      await FirebaseDatabase.instance
-          .ref('audio_calls_active')
-          .child(data['callerId'])
-          .child(myUid)
-          .set({
-            'sdp': answer.sdp,
-            'type': answer.type,
-            'timestamp': ServerValue.timestamp,
+    _agoraClient = AgoraClient(
+      agoraConnectionData: AgoraConnectionData(
+        appId: "e7f6e9aeecf14b2ba10e3f40be9f56e7",
+        channelName: widget.channelName,
+        tempToken: token,
+      ),
+      enabledPermission: [Permission.microphone],
+      agoraEventHandlers: AgoraRtcEventHandlers(
+        onUserJoined: (connection, remoteUid, elapsed) async {
+          if (!mounted || _isConnected) return;
+          setState(() {
+            _isConnected = true;
+            _statusText = _formatDuration(_callSeconds);
           });
-    }
+          _onCallConnected();
+          await CallNotificationService().setCallConnected(widget.callId);
+        },
+        onUserOffline: (connection, remoteUid, reason) async {
+          if (!mounted) return;
+          await _endCall();
+        },
+      ),
+    );
+    await _agoraClient!.initialize();
+    await _agoraClient!.engine.muteLocalVideoStream(true);
+
+    _ringTimer = Timer(const Duration(minutes: 1), () {
+      if (!_isConnected && mounted) {
+        _db.rejectDirectCall(
+          myUid: widget.partnerUid,
+          matchId: widget.matchId,
+          status: 'no_answer',
+        );
+        _endCall();
+      }
+    });
   }
 
   void _onCallConnected() {
     if (!mounted) return;
     _ringTimer?.cancel();
     _callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) setState(() => _callSeconds++);
+      if (mounted) {
+        setState(() {
+          _callSeconds++;
+          _statusText = _formatDuration(_callSeconds);
+        });
+      }
     });
   }
 
-  void _endCall({bool missed = false}) async {
+  Future<void> _endCall({bool notifyPeer = false}) async {
     _callTimer?.cancel();
     _ringTimer?.cancel();
-    _callSub?.cancel();
+    _statusSub?.cancel();
+    if (notifyPeer) {
+      await _db.endDirectCall(widget.matchId);
+    }
+    await CallNotificationService().endCallkit(widget.callId);
+    await _agoraClient?.engine.leaveChannel();
+    _agoraClient = null;
 
-    final myUid = context.read<AuthProvider>().firebaseUser!.uid;
-
-    // Clean up Firebase
-    await FirebaseDatabase.instance
-        .ref('audio_calls')
-        .child(widget.partnerUid)
-        .remove();
-    await FirebaseDatabase.instance.ref('audio_calls').child(myUid).remove();
-    await FirebaseDatabase.instance
-        .ref('audio_calls_active')
-        .child('${myUid}_${widget.partnerUid}')
-        .remove();
-    await FirebaseDatabase.instance
-        .ref('audio_calls_active')
-        .child('${widget.partnerUid}_$myUid')
-        .remove();
-
-    // Save call event in chat
-    final chatService = ChatService();
-    final chatId = chatService.getChatId(myUid, widget.partnerUid);
-    final duration = _formatDuration(_callSeconds);
-    final callMsg = msg_model.MessageModel(
-      id: '',
-      senderId: myUid,
-      text: missed ? '📞 Missed audio call' : '📞 Audio call · $duration',
-      type: msg_model.MessageType.callEvent,
-      timestamp: DateTime.now(),
-    );
-    await chatService.sendMessage(chatId, callMsg);
-
-    if (mounted) context.pop();
+    if (mounted) context.go('/home');
   }
 
   String _formatDuration(int totalSeconds) {
@@ -352,9 +250,7 @@ class _AudioCallScreenState extends State<AudioCallScreen>
 
             // Status
             Text(
-              _isConnected
-                  ? _formatDuration(_callSeconds)
-                  : (widget.isOutgoing ? 'Calling...' : 'Incoming audio call'),
+              _statusText,
               style: TextStyle(
                 fontSize: 16,
                 color: _isConnected
@@ -387,47 +283,58 @@ class _AudioCallScreenState extends State<AudioCallScreen>
                               : Icons.mic_rounded,
                           label: _isMuted ? 'Unmute' : 'Mute',
                           active: _isMuted,
-                          onTap: () => setState(() => _isMuted = !_isMuted),
+                          onTap: () async {
+                            final next = !_isMuted;
+                            await _agoraClient?.engine.muteLocalAudioStream(next);
+                            if (mounted) setState(() => _isMuted = next);
+                          },
                         ),
 
-                        // End call
                         _buildCallBtn(
                           icon: Icons.call_end_rounded,
                           color: AppColors.error,
-                          onTap: () => _endCall(),
+                          onTap: () => _endCall(notifyPeer: true),
                           shake: false,
                         ),
 
-                        // Speaker
                         _buildControlBtn(
                           icon: _isSpeaker
                               ? Icons.volume_up_rounded
                               : Icons.volume_down_rounded,
                           label: 'Speaker',
                           active: _isSpeaker,
-                          onTap: () => setState(() => _isSpeaker = !_isSpeaker),
+                          onTap: () async {
+                            final next = !_isSpeaker;
+                            await _agoraClient?.engine.setEnableSpeakerphone(next);
+                            if (mounted) setState(() => _isSpeaker = next);
+                          },
                         ),
                       ],
                     )
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        // Reject
                         _buildCallBtn(
                           icon: Icons.close_rounded,
                           color: Colors.grey[700]!,
-                          onTap: () => _endCall(),
+                          onTap: () => _endCall(notifyPeer: true),
                           shake: false,
                         ),
 
                         const SizedBox(width: 40),
 
-                        // Accept (Shake animation)
-                        _buildCallBtn(
-                          icon: Icons.call_rounded,
-                          color: AppColors.success,
-                          onTap: () => _acceptCall(),
-                          shake: true,
+                        _buildControlBtn(
+                          icon: Icons.message_rounded,
+                          label: 'Message',
+                          active: true,
+                          onTap: () {
+                            final myUid =
+                                context.read<AuthProvider>().firebaseUser?.uid;
+                            if (myUid == null) return;
+                            final chatId =
+                                ChatService().getChatId(myUid, widget.partnerUid);
+                            context.push('/chat/$chatId');
+                          },
                         ),
                       ],
                     ),

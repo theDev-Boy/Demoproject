@@ -41,7 +41,7 @@ class CustomButton extends StatelessWidget {
               onPressed: isLoading ? null : onPressed,
               style: OutlinedButton.styleFrom(
                 foregroundColor: fgColor,
-                side: BorderSide(color: AppColors.border, width: 1.5),
+                side: const BorderSide(color: AppColors.border, width: 1.5),
                 shape: RoundedRectangleBorder(
                   borderRadius:
                       BorderRadius.circular(AppDimensions.radiusL),

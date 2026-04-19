@@ -19,8 +19,16 @@ dependencies:
   # Google Sign In
   google_sign_in: ^6.2.1
 
-  # WebRTC for P2P Video
-  flutter_webrtc: ^0.12.5+hotfix.1
+  # Agora SDK for video/audio calls
+  agora_uikit: ^1.1.2
+
+  # Voice Messages
+  record: ^5.0.0
+  audioplayers: ^5.2.0
+  path_provider: ^2.1.2
+
+  # Calls background handler
+  flutter_callkit_incoming: ^3.0.0
 
   # State Management
   provider: ^6.1.2
@@ -62,7 +70,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^3.0.2
   flutter_launcher_icons: ^0.13.1
 
 flutter_launcher_icons:

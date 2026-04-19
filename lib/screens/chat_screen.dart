@@ -1,9 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../models/message_model.dart';
@@ -12,6 +17,7 @@ import '../models/user_model.dart';
 import '../widgets/avatar_widget.dart';
 import '../config/app_colors.dart';
 import '../config/app_typography.dart';
+import '../services/call_notification_service.dart';
 import '../services/database_service.dart';
 import 'package:intl/intl.dart';
 
@@ -35,15 +41,25 @@ class _ChatScreenState extends State<ChatScreen> {
   final Stopwatch _stopwatch = Stopwatch();
   Timer? _recordTimer;
   String _recordDurationStr = "0:00";
+  final AudioRecorder _recorder = AudioRecorder();
+  final AudioPlayer _voicePlayer = AudioPlayer();
+  String? _recordPath;
+  final Map<String, String> _voiceFileCache = {};
+  String? _playingMessageId;
+  Duration _playingPosition = Duration.zero;
+  Duration _playingDuration = Duration.zero;
 
   // Partner data
   UserModel? _partner;
   String _partnerId = '';
+  static const int _maxVoiceDurationMs = 20000;
+  static const int _maxVoiceBytes = 200000;
 
   @override
   void initState() {
     super.initState();
     _loadPartnerInfo();
+    _wireVoicePlayerStreams();
     _msgCtrl.addListener(() {
       // Show send button reactively
       setState(() {});
@@ -57,6 +73,11 @@ class _ChatScreenState extends State<ChatScreen> {
     context.read<ChatProvider>().setTyping(widget.chatId, auth.firebaseUser!.uid, false);
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
+    _recordTimer?.cancel();
+    _stopwatch.stop();
+    _voiceFileCache.clear();
+    _recorder.dispose();
+    _voicePlayer.dispose();
     super.dispose();
   }
 
@@ -111,7 +132,24 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _startRecording() {
+  Future<void> _startRecording() async {
+    if (!await _recorder.hasPermission()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission required.')),
+        );
+      }
+      return;
+    }
+
+    final tempDir = await getTemporaryDirectory();
+    _recordPath =
+        '${tempDir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    await _recorder.start(
+      const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000),
+      path: _recordPath!,
+    );
+
     setState(() {
       _isRecording = true;
       _stopwatch.reset();
@@ -129,23 +167,48 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _stopRecording({required bool cancel}) {
+  Future<void> _stopRecording({required bool cancel}) async {
     if (!_isRecording) return;
+    final auth = context.read<AuthProvider>();
+    final chat = context.read<ChatProvider>();
     _recordTimer?.cancel();
     _stopwatch.stop();
     setState(() => _isRecording = false);
+    final finalPath = await _recorder.stop();
 
-    if (!cancel && _stopwatch.elapsedMilliseconds > 500) {
-      // Simulate sending WebRTC P2P voice data. 
-      // For now, storing as text with a prefix.
+    if (!cancel && _stopwatch.elapsedMilliseconds > 500 && finalPath != null) {
+      final elapsedMs = _stopwatch.elapsedMilliseconds;
+      if (elapsedMs > _maxVoiceDurationMs) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Voice clip too long. Keep it under 20 seconds.')),
+          );
+        }
+        return;
+      }
+
+      final bytes = await File(finalPath).readAsBytes();
+      if (bytes.length > _maxVoiceBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Voice clip too large. Send a shorter clip.')),
+          );
+        }
+        return;
+      }
+
       final msg = MessageModel(
         id: '',
-        senderId: context.read<AuthProvider>().firebaseUser!.uid,
-        text: 'P2P_VOICE|$_recordDurationStr',
+        senderId: auth.firebaseUser!.uid,
+        text: 'Voice message',
         type: MessageType.voice,
         timestamp: DateTime.now(),
+        voiceBase64: base64Encode(bytes),
+        voiceMimeType: 'audio/mp4',
+        voiceDurationMs: elapsedMs,
+        voiceSizeBytes: bytes.length,
       );
-      context.read<ChatProvider>().sendMessage(widget.chatId, msg);
+      chat.sendMessage(widget.chatId, msg);
       
       Future.delayed(const Duration(milliseconds: 200), () {
         if (_scrollCtrl.hasClients) {
@@ -157,6 +220,24 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       });
     }
+  }
+
+  void _wireVoicePlayerStreams() {
+    _voicePlayer.onPositionChanged.listen((value) {
+      if (!mounted) return;
+      setState(() => _playingPosition = value);
+    });
+    _voicePlayer.onDurationChanged.listen((value) {
+      if (!mounted) return;
+      setState(() => _playingDuration = value);
+    });
+    _voicePlayer.onPlayerComplete.listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _playingMessageId = null;
+        _playingPosition = Duration.zero;
+      });
+    });
   }
 
   bool _isOnlyEmoji(String text) {
@@ -175,9 +256,23 @@ class _ChatScreenState extends State<ChatScreen> {
     context.read<ChatProvider>().setTyping(widget.chatId, auth.firebaseUser!.uid, typing);
   }
 
-  void _startAudioCall() {
+  Future<void> _startAudioCall() async {
     if (_partner == null) return;
+    final me = context.read<AuthProvider>().userModel;
+    if (me == null) return;
+    final callData = await DatabaseService().createDirectCall(
+      caller: me,
+      calleeUid: _partnerId,
+      calleeName: _partner!.name,
+      calleeAvatar: _partner!.avatarUrl,
+      isVideo: false,
+    );
+    await CallNotificationService().startOutgoingCallkit(callData);
+    if (!mounted) return;
     context.push('/audio-call', extra: {
+      'callId': callData['callId'] as String,
+      'matchId': callData['matchId'] as String,
+      'channelName': callData['channelName'] as String,
       'partnerUid': _partnerId,
       'partnerName': _partner!.name,
       'partnerAvatar': _partner!.avatarUrl,
@@ -185,17 +280,28 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _startVideoCall() {
+  Future<void> _startVideoCall() async {
     if (_partner == null) return;
-    // Place a direct video call
-    final myUid = context.read<AuthProvider>().firebaseUser!.uid;
-    final myName = context.read<AuthProvider>().userModel?.name ?? 'User';
-    FirebaseDatabase.instance.ref('direct_calls').child(_partnerId).set({
-      'callerId': myUid,
-      'callerName': myName,
-      'timestamp': ServerValue.timestamp,
+    final me = context.read<AuthProvider>().userModel;
+    if (me == null) return;
+    final callData = await DatabaseService().createDirectCall(
+      caller: me,
+      calleeUid: _partnerId,
+      calleeName: _partner!.name,
+      calleeAvatar: _partner!.avatarUrl,
+      isVideo: true,
+    );
+    await CallNotificationService().startOutgoingCallkit(callData);
+    if (!mounted) return;
+    context.push('/video-call', extra: {
+      'callId': callData['callId'] as String,
+      'matchId': callData['matchId'] as String,
+      'channelName': callData['channelName'] as String,
+      'partnerUid': _partnerId,
+      'partnerName': _partner!.name,
+      'partnerAvatar': _partner!.avatarUrl,
+      'isOutgoing': true,
     });
-    context.push('/call');
   }
 
   void _showPartnerProfile() {
@@ -218,7 +324,7 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(height: 16),
             Text(_partner!.name, style: AppTypography.headlineMedium),
             const SizedBox(height: 4),
-            Text(_partner!.email, style: TextStyle(color: AppColors.textSecondary)),
+            Text(_partner!.email, style: const TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -550,15 +656,21 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           child: Text(
             msg.text,
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
         ),
       );
     }
 
     if (msg.type == MessageType.voice) {
-      final parts = msg.text.split('|');
-      final duration = parts.length > 1 ? parts[1] : '0:00';
+      final duration = msg.voiceDurationMs != null
+          ? _formatMillis(msg.voiceDurationMs!)
+          : '0:00';
+      final isPlaying = _playingMessageId == msg.id;
+      final total = _playingDuration.inMilliseconds == 0
+          ? (msg.voiceDurationMs ?? 1)
+          : _playingDuration.inMilliseconds;
+      final progress = (_playingPosition.inMilliseconds / total).clamp(0.0, 1.0);
       return Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: GestureDetector(
@@ -578,25 +690,71 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.play_arrow_rounded, color: isMe ? Colors.white : AppColors.primary, size: 28),
-                const SizedBox(width: 8),
-                // Fake waveform
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: List.generate(12, (i) {
-                    final height = 8.0 + (i % 3) * 6.0;
-                    return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 1),
-                      width: 3,
-                      height: height,
-                      decoration: BoxDecoration(
-                        color: isMe ? Colors.white70 : AppColors.primary.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    );
-                  }),
+                Icon(
+                  Icons.mic_rounded,
+                  color: isMe ? Colors.white : AppColors.primary,
+                  size: 18,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 6),
+                IconButton(
+                  icon: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: isMe ? Colors.white : AppColors.primary,
+                    size: 28,
+                  ),
+                  onPressed: () async {
+                    if (msg.voiceBase64 == null || msg.voiceBase64!.isEmpty) return;
+                    if (isPlaying) {
+                      await _voicePlayer.pause();
+                      setState(() => _playingMessageId = null);
+                    } else {
+                      final cached = _voiceFileCache[msg.id];
+                      final path = cached ?? await _decodeVoiceToTempPath(msg);
+                      if (path == null) return;
+                      _voiceFileCache[msg.id] = path;
+                      await _voicePlayer.play(DeviceFileSource(path));
+                      setState(() => _playingMessageId = msg.id);
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 42,
+                  height: 18,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: List.generate(5, (index) {
+                      final isActive = isPlaying && index.isEven;
+                      final height = isActive ? 16.0 - (index * 1.5) : 8.0;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        width: 4,
+                        height: height,
+                        decoration: BoxDecoration(
+                          color: isMe
+                              ? Colors.white.withValues(alpha: 0.85)
+                              : AppColors.primary.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 90,
+                  child: Slider(
+                    value: progress,
+                    onChanged: (value) async {
+                      final target = Duration(
+                        milliseconds: (total * value).round(),
+                      );
+                      await _voicePlayer.seek(target);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Text(
                   duration,
                   style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87)),
@@ -844,5 +1002,30 @@ class _ChatScreenState extends State<ChatScreen> {
         const Text('< Slide to cancel', style: TextStyle(color: Colors.grey, fontSize: 12)),
       ],
     );
+  }
+
+  String _formatMillis(int milliseconds) {
+    final totalSeconds = (milliseconds / 1000).round();
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Future<String?> _decodeVoiceToTempPath(MessageModel msg) async {
+    try {
+      if (msg.voiceBase64 == null) return null;
+      final tempDir = await getTemporaryDirectory();
+      final path = '${tempDir.path}/voice_${msg.id}.m4a';
+      final bytes = base64Decode(msg.voiceBase64!);
+      await File(path).writeAsBytes(bytes, flush: true);
+      return path;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to play voice message.')),
+        );
+      }
+      return null;
+    }
   }
 }

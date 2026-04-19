@@ -1,14 +1,13 @@
 import 'dart:async';
+import 'package:agora_uikit/agora_uikit.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../models/match_model.dart';
 import '../models/user_model.dart';
-import '../services/database_service.dart';
-import '../services/webrtc_service.dart';
-import '../utils/logger.dart';
-import '../utils/constants.dart';
-import 'package:firebase_database/firebase_database.dart';
+import '../services/agora_token_service.dart';
 import '../services/call_notification_service.dart';
+import '../services/database_service.dart';
+import '../utils/constants.dart';
 
 /// States of a video call.
 enum CallState { idle, searching, connecting, connected, ended, error }
@@ -16,7 +15,7 @@ enum CallState { idle, searching, connecting, connected, ended, error }
 /// Manages the entire video call lifecycle.
 class CallProvider extends ChangeNotifier {
   final DatabaseService _db = DatabaseService();
-  final WebRTCService _webrtc = WebRTCService();
+  final AgoraTokenService _tokenService = AgoraTokenService();
 
   CallState _state = CallState.idle;
   MatchModel? _currentMatch;
@@ -26,20 +25,14 @@ class CallProvider extends ChangeNotifier {
   Timer? _callTimer;
   String? _error;
 
-  // WebRTC renderers
-  final RTCVideoRenderer localRenderer = RTCVideoRenderer();
-  final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
+  AgoraClient? _agoraClient;
+  bool _isMicMuted = false;
+  bool _isCameraOff = false;
+  bool _isFrontCamera = true;
+  bool _videoEnabled = true;
 
-  // Subscriptions
   StreamSubscription? _matchStatusSub;
-  StreamSubscription? _answerSub;
-  StreamSubscription? _offerSub;
-  StreamSubscription? _candidateSub;
   StreamSubscription? _searchSub;
-
-  // Buffer ICE candidates until remote description is set
-  final List<RTCIceCandidate> _pendingCandidates = [];
-  bool _remoteDescSet = false;
   bool _isMinimized = false;
 
   bool get isMinimized => _isMinimized;
@@ -55,8 +48,10 @@ class CallProvider extends ChangeNotifier {
   String? get partnerCountry => _partnerCountry;
   int get callDurationSeconds => _callDurationSeconds;
   String? get error => _error;
-  bool get isMicMuted => _webrtc.isMicMuted;
-  bool get isCameraOff => _webrtc.isCameraOff;
+  bool get isMicMuted => _isMicMuted;
+  bool get isCameraOff => _isCameraOff;
+  bool get isVideoCall => _videoEnabled;
+  AgoraClient? get agoraClient => _agoraClient;
 
   String get callDurationFormatted {
     final m = (_callDurationSeconds ~/ 60).toString().padLeft(2, '0');
@@ -64,15 +59,11 @@ class CallProvider extends ChangeNotifier {
     return '$m:$s';
   }
 
-  /// Initialize video renderers.
-  Future<void> initRenderers() async {
-    await localRenderer.initialize();
-    await remoteRenderer.initialize();
-  }
+  Future<void> initRenderers() async {}
 
-  /// Start searching for a partner.
-  Future<void> startSearching(UserModel currentUser) async {
+  Future<void> startSearching(UserModel currentUser, {bool videoEnabled = true}) async {
     if (_state != CallState.idle && _state != CallState.ended) return;
+    _videoEnabled = videoEnabled;
 
     _state = CallState.searching;
     _error = null;
@@ -80,17 +71,10 @@ class CallProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Pre-warm: Initialize local stream if not already exists
-      if (_webrtc.localStream == null) {
-        final localStream = await _webrtc.initLocalStream();
-        localRenderer.srcObject = localStream;
-      }
-      notifyListeners();
-
-      // 2. Join search queue
+      // 1. Join search queue
       await _db.joinSearchQueue(currentUser);
 
-      // 3. LISTEN FOR OTHER SEARCHING USERS (Instant Reaction)
+      // 2. LISTEN FOR OTHER SEARCHING USERS
       _searchSub = FirebaseDatabase.instance
           .ref(AppConstants.activeUsersPath)
           .onValue
@@ -123,7 +107,7 @@ class CallProvider extends ChangeNotifier {
                   _partnerCountry = partnerData['country'] as String? ?? '';
                   _currentMatch = await _db.getMatch(matchId);
 
-                  await _startCallAsInitiator(
+                  await _startCallAsInitiatorAgora(
                     matchId,
                     currentUser.uid,
                     partnerUid,
@@ -134,7 +118,7 @@ class CallProvider extends ChangeNotifier {
             }
           });
 
-      // 4. LISTEN FOR BEING MATCHED BY SOMEONE ELSE
+      // 3. LISTEN FOR BEING MATCHED BY SOMEONE ELSE
       _db.listenForMatch(currentUser.uid).listen((event) {
         if (!event.snapshot.exists || event.snapshot.value == null) return;
         final data = event.snapshot.value as Map<dynamic, dynamic>;
@@ -147,7 +131,6 @@ class CallProvider extends ChangeNotifier {
         }
       });
     } catch (e) {
-      logger.e('Failed to start searching', error: e);
       _error = 'Connecting failed. Please check camera permission.';
       _state = CallState.idle;
       notifyListeners();
@@ -172,209 +155,93 @@ class CallProvider extends ChangeNotifier {
       // Stop the main search listener once matched
       _searchSub?.cancel();
 
-      await _startCallAsReceiver(
+      await _startCallAsReceiverAgora(
         matchId,
         currentUser.uid,
         _currentMatch!.getPartnerUid(currentUser.uid),
       );
     } catch (e) {
-      logger.e('Error handling match', error: e);
+      _error = 'Failed to accept matched call.';
+      _state = CallState.error;
+      notifyListeners();
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // WEBRTC SIGNALING
-  // ---------------------------------------------------------------------------
-
-  Future<void> _startCallAsInitiator(
+  Future<void> _startCallAsInitiatorAgora(
     String matchId,
     String myUid,
     String partnerUid,
   ) async {
     _state = CallState.connecting;
-    _remoteDescSet = false;
-    _pendingCandidates.clear();
     notifyListeners();
 
     try {
-      // Set up WebRTC callbacks
-      _webrtc.onRemoteStream = (stream) {
-        remoteRenderer.srcObject = stream;
-        if (_state != CallState.connected) {
-          _state = CallState.connected;
-          _startCallTimer();
-          notifyListeners();
-        }
-      };
+      await _joinAgora(matchId, myUid, videoEnabled: true);
 
-      _webrtc.onIceCandidate = (candidate) {
-        _db.sendIceCandidate(matchId, myUid, {
-          'candidate': candidate.candidate,
-          'sdpMid': candidate.sdpMid,
-          'sdpMLineIndex': candidate.sdpMLineIndex,
-        });
-      };
-
-      _webrtc.onConnectionStateChange = (state) {
-        if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
-            state ==
-                RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
-          endCall(myUid);
-        }
-      };
-
-      await _webrtc.initializePeerConnection();
-
-      // Create and send offer
-      final offer = await _webrtc.createOffer();
-      await _db.sendOffer(matchId, {'type': offer.type, 'sdp': offer.sdp});
-
-      // Listen for answer
-      _answerSub = _db.listenForAnswer(matchId).listen((event) async {
-        if (!event.snapshot.exists || event.snapshot.value == null) return;
-        final data = event.snapshot.value as Map<dynamic, dynamic>;
-        final answer = RTCSessionDescription(
-          data['sdp'] as String?,
-          data['type'] as String?,
-        );
-        await _webrtc.setRemoteDescription(answer);
-        _remoteDescSet = true;
-        // Flush buffered ICE candidates
-        for (final c in _pendingCandidates) {
-          await _webrtc.addIceCandidate(c);
-        }
-        _pendingCandidates.clear();
-      });
-
-      // Listen for ICE candidates from partner (buffer if remote desc not set)
-      _candidateSub = _db.listenForCandidates(matchId, partnerUid).listen((
-        event,
-      ) async {
-        if (!event.snapshot.exists || event.snapshot.value == null) return;
-        final data = event.snapshot.value as Map<dynamic, dynamic>;
-        final candidate = RTCIceCandidate(
-          data['candidate'] as String?,
-          data['sdpMid'] as String?,
-          data['sdpMLineIndex'] as int?,
-        );
-        if (_remoteDescSet) {
-          logger.i('[WebRTC] Adding candidate immediately');
-          await _webrtc.addIceCandidate(candidate);
-        } else {
-          logger.i('[WebRTC] Buffering candidate');
-          _pendingCandidates.add(candidate);
-        }
-      });
-
-      // Listen for partner ending the call
       _matchStatusSub = _db.listenForMatchStatus(matchId).listen((event) {
         if (!event.snapshot.exists) return;
         final status = event.snapshot.value as String?;
-        if (status == 'ended' && _state == CallState.connected) {
+        if ((status == 'ended' || status == 'declined' || status == 'busy') &&
+            _state == CallState.connected) {
           _onPartnerEndedCall();
         }
       });
     } catch (e) {
-      logger.e('Failed to start call as initiator', error: e);
       _error = 'Connection failed. Please try again.';
-      _state = CallState.idle;
+      _state = CallState.error;
       notifyListeners();
     }
   }
 
-  Future<void> _startCallAsReceiver(
+  Future<void> _startCallAsReceiverAgora(
     String matchId,
     String myUid,
     String partnerUid,
   ) async {
     _state = CallState.connecting;
-    _remoteDescSet = false;
-    _pendingCandidates.clear();
     notifyListeners();
 
     try {
-      _webrtc.onRemoteStream = (stream) {
-        remoteRenderer.srcObject = stream;
-        if (_state != CallState.connected) {
-          _state = CallState.connected;
-          _startCallTimer();
-          notifyListeners();
-        }
-      };
+      await _joinAgora(matchId, myUid, videoEnabled: _videoEnabled);
 
-      _webrtc.onIceCandidate = (candidate) {
-        _db.sendIceCandidate(matchId, myUid, {
-          'candidate': candidate.candidate,
-          'sdpMid': candidate.sdpMid,
-          'sdpMLineIndex': candidate.sdpMLineIndex,
-        });
-      };
-
-      _webrtc.onConnectionStateChange = (state) {
-        if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
-            state ==
-                RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
-          endCall(myUid);
-        }
-      };
-
-      await _webrtc.initializePeerConnection();
-
-      // Listen for offer
-      _offerSub = _db.listenForOffer(matchId).listen((event) async {
-        if (!event.snapshot.exists || event.snapshot.value == null) return;
-        final data = event.snapshot.value as Map<dynamic, dynamic>;
-        final offer = RTCSessionDescription(
-          data['sdp'] as String?,
-          data['type'] as String?,
-        );
-        await _webrtc.setRemoteDescription(offer);
-        _remoteDescSet = true;
-        // Flush buffered ICE candidates
-        for (final c in _pendingCandidates) {
-          await _webrtc.addIceCandidate(c);
-        }
-        _pendingCandidates.clear();
-
-        // Create and send answer
-        final answer = await _webrtc.createAnswer();
-        await _db.sendAnswer(matchId, {'type': answer.type, 'sdp': answer.sdp});
-      });
-
-      // Listen for ICE candidates from partner (buffer if remote desc not set)
-      _candidateSub = _db.listenForCandidates(matchId, partnerUid).listen((
-        event,
-      ) async {
-        if (!event.snapshot.exists || event.snapshot.value == null) return;
-        final data = event.snapshot.value as Map<dynamic, dynamic>;
-        final candidate = RTCIceCandidate(
-          data['candidate'] as String?,
-          data['sdpMid'] as String?,
-          data['sdpMLineIndex'] as int?,
-        );
-        if (_remoteDescSet) {
-          logger.i('[WebRTC] Adding candidate immediately');
-          await _webrtc.addIceCandidate(candidate);
-        } else {
-          logger.i('[WebRTC] Buffering candidate');
-          _pendingCandidates.add(candidate);
-        }
-      });
-
-      // Listen for partner ending the call
       _matchStatusSub = _db.listenForMatchStatus(matchId).listen((event) {
         if (!event.snapshot.exists) return;
         final status = event.snapshot.value as String?;
-        if (status == 'ended' && _state == CallState.connected) {
+        if ((status == 'ended' || status == 'declined' || status == 'busy') &&
+            _state == CallState.connected) {
           _onPartnerEndedCall();
         }
       });
     } catch (e) {
-      logger.e('Failed to start call as receiver', error: e);
       _error = 'Connection failed. Please try again.';
-      _state = CallState.idle;
+      _state = CallState.error;
       notifyListeners();
     }
+  }
+
+  Future<void> _joinAgora(
+    String channelName,
+    String uid, {
+    required bool videoEnabled,
+  }) async {
+    final token = await _tokenService.fetchRtcToken(
+      channelName: channelName,
+      uid: uid,
+      videoEnabled: videoEnabled,
+    );
+
+    _agoraClient = AgoraClient(
+      agoraConnectionData: AgoraConnectionData(
+        appId: "e7f6e9aeecf14b2ba10e3f40be9f56e7",
+        channelName: channelName,
+        tempToken: token,
+      ),
+      enabledPermission: [Permission.camera, Permission.microphone],
+    );
+    await _agoraClient!.initialize();
+    _state = CallState.connected;
+    _startCallTimer();
+    notifyListeners();
   }
 
   void _onPartnerEndedCall() async {
@@ -384,22 +251,13 @@ class CallProvider extends ChangeNotifier {
     // Dismiss notification
     CallNotificationService().dismissCallNotification();
     
-    // Clean up WebRTC peer connection but KEEP the local camera alive
-    await _webrtc.stopPeerConnection();
-    remoteRenderer.srcObject = null;
-    
-    // Re-attach local stream to renderer (fixes Phone B camera disappearing)
-    if (_webrtc.localStream != null) {
-      localRenderer.srcObject = _webrtc.localStream;
-      logger.i('[CallProvider] Local stream re-attached to renderer');
-    }
-    
+    await _agoraClient?.engine.leaveChannel();
+    _agoraClient = null;
+
     _currentMatch = null;
     _partnerName = null;
     _partnerCountry = null;
     _callDurationSeconds = 0;
-    _remoteDescSet = false;
-    _pendingCandidates.clear();
     
     _state = CallState.ended;
     notifyListeners();
@@ -418,17 +276,20 @@ class CallProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   void toggleMic() {
-    _webrtc.toggleMic();
+    _isMicMuted = !_isMicMuted;
+    _agoraClient?.engine.muteLocalAudioStream(_isMicMuted);
     notifyListeners();
   }
 
   void toggleCamera() {
-    _webrtc.toggleCamera();
+    _isCameraOff = !_isCameraOff;
+    _agoraClient?.engine.muteLocalVideoStream(_isCameraOff);
     notifyListeners();
   }
 
   Future<void> switchCamera() async {
-    await _webrtc.switchCamera();
+    _isFrontCamera = !_isFrontCamera;
+    await _agoraClient?.engine.switchCamera();
     notifyListeners();
   }
 
@@ -441,12 +302,10 @@ class CallProvider extends ChangeNotifier {
       await _db.endMatch(_currentMatch!.matchId);
     }
     await _db.leaveSearchQueue(myUid);
-    await _webrtc.dispose();
+    await _agoraClient?.engine.leaveChannel();
+    _agoraClient = null;
     
     CallNotificationService().dismissCallNotification();
-
-    localRenderer.srcObject = null;
-    remoteRenderer.srcObject = null;
 
     _currentMatch = null;
     _partnerName = null;
@@ -464,22 +323,14 @@ class CallProvider extends ChangeNotifier {
     if (_currentMatch != null) {
       await _db.endMatch(_currentMatch!.matchId);
     }
-    await _webrtc.stopPeerConnection();
+    await _agoraClient?.engine.leaveChannel();
+    _agoraClient = null;
     
     CallNotificationService().dismissCallNotification();
-
-    remoteRenderer.srcObject = null;
     _currentMatch = null;
     _partnerName = null;
     _partnerCountry = null;
     _callDurationSeconds = 0;
-    _remoteDescSet = false;
-    _pendingCandidates.clear();
-
-    // Re-attach local stream (keeps camera visible during search)
-    if (_webrtc.localStream != null) {
-      localRenderer.srcObject = _webrtc.localStream;
-    }
 
     _state = CallState.idle;
     notifyListeners();
@@ -516,9 +367,6 @@ class CallProvider extends ChangeNotifier {
 
   void _cancelSubscriptions() {
     _matchStatusSub?.cancel();
-    _answerSub?.cancel();
-    _offerSub?.cancel();
-    _candidateSub?.cancel();
     _searchSub?.cancel();
   }
 
@@ -527,9 +375,7 @@ class CallProvider extends ChangeNotifier {
   void dispose() {
     _stopCallTimer();
     _cancelSubscriptions();
-    _webrtc.dispose();
-    localRenderer.dispose();
-    remoteRenderer.dispose();
+    _agoraClient?.engine.leaveChannel();
     super.dispose();
   }
 }

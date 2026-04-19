@@ -10,6 +10,7 @@ import '../screens/history_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/chat_screen.dart';
 import '../screens/audio_call_screen.dart';
+import '../screens/direct_video_call_screen.dart';
 import '../screens/friends_screen.dart';
 import '../screens/blocked_users_screen.dart';
 
@@ -71,6 +72,25 @@ class AppRouter {
           builder: (context, state) {
             final extra = state.extra as Map<String, dynamic>;
             return AudioCallScreen(
+              callId: extra['callId'] as String,
+              matchId: extra['matchId'] as String,
+              channelName: extra['channelName'] as String,
+              partnerUid: extra['partnerUid'] as String,
+              partnerName: extra['partnerName'] as String,
+              partnerAvatar: extra['partnerAvatar'] as String? ?? '',
+              isOutgoing: extra['isOutgoing'] as bool? ?? true,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/video-call',
+          name: 'video-call',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>;
+            return DirectVideoCallScreen(
+              callId: extra['callId'] as String,
+              matchId: extra['matchId'] as String,
+              channelName: extra['channelName'] as String,
               partnerUid: extra['partnerUid'] as String,
               partnerName: extra['partnerName'] as String,
               partnerAvatar: extra['partnerAvatar'] as String? ?? '',

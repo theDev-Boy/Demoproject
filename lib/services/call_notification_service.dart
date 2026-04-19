@@ -1,9 +1,12 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
 import '../config/firebase_config.dart';
+import 'system_call_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -20,7 +23,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Handle background messages
   debugPrint("Handling a background message: ${message.messageId}");
   if (message.data['type'] == 'call') {
-     CallNotificationService().showIncomingCallNotification(message.data['callerName'] ?? 'Someone');
+    await SystemCallService().showIncomingCall(message.data);
+  } else if (message.data['type'] == 'message') {
+    await CallNotificationService().showMessageNotification(
+      title: message.data['senderName'] ?? 'New message',
+      body: message.data['body'] ?? 'Open chat',
+      chatId: message.data['chatId'] ?? '',
+    );
   }
 }
 
@@ -30,12 +39,23 @@ class CallNotificationService {
   CallNotificationService._internal();
 
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final StreamController<String> _tapController = StreamController<String>.broadcast();
+  Stream<String> get onNotificationTap => _tapController.stream;
+  SystemCallService get _systemCalls => SystemCallService();
 
   Future<void> init() async {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings();
     const initSettings = InitializationSettings(android: androidInit, iOS: iosInit);
-    await _notifications.initialize(initSettings);
+    await _notifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload != null && payload.isNotEmpty) {
+          _tapController.add(payload);
+        }
+      },
+    );
 
     final androidImplementation = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await androidImplementation?.requestNotificationsPermission();
@@ -50,9 +70,17 @@ class CallNotificationService {
       enableVibration: true,
     );
     await androidImplementation?.createNotificationChannel(channel);
+    const msgChannel = AndroidNotificationChannel(
+      'messages_channel',
+      'Messages',
+      description: 'New message notifications',
+      importance: Importance.high,
+    );
+    await androidImplementation?.createNotificationChannel(msgChannel);
 
     // Setup Firebase Messaging
     await setupFcm();
+    await _systemCalls.requestPermissions();
   }
 
   Future<void> setupFcm() async {
@@ -74,11 +102,92 @@ class CallNotificationService {
 
     // Listen to foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-       debugPrint('Got a message whilst in the foreground!');
-       if (message.data['type'] == 'call') {
-          showIncomingCallNotification(message.data['callerName'] ?? 'Someone');
-       }
+      debugPrint('Got a message whilst in the foreground!');
+      unawaited(_handleForegroundMessage(message));
     });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      if (message.data['type'] == 'call') {
+        _tapController.add(_callPayload(message.data));
+        return;
+      }
+      final chatId = message.data['chatId'];
+      if (chatId != null && chatId is String && chatId.isNotEmpty) {
+        _tapController.add('chat:$chatId');
+      }
+    });
+  }
+
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    if (message.data['type'] == 'call') {
+      await _systemCalls.showIncomingCall(message.data);
+      return;
+    }
+    if (message.data['type'] == 'message') {
+      await showMessageNotification(
+        title: message.data['senderName'] ?? 'New message',
+        body: message.data['body'] ?? 'Open chat',
+        chatId: message.data['chatId'] ?? '',
+      );
+    }
+  }
+
+  String _callPayload(Map<dynamic, dynamic> raw) {
+    final data = raw.map(
+      (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
+    );
+    final query = data.entries
+        .map((entry) => '${entry.key}=${Uri.encodeComponent(entry.value)}')
+        .join('&');
+    return 'call:$query';
+  }
+
+  Stream get onSystemCallEvent => _systemCalls.onEvent;
+
+  Future<void> registerCurrentUser(String uid) => _registerCurrentUser(uid);
+
+  Future<void> _registerCurrentUser(String uid) async {
+    final messaging = FirebaseMessaging.instance;
+    final token = await messaging.getToken();
+    if (token != null && token.isNotEmpty) {
+      await FirebaseDatabase.instance.ref('users').child(uid).update({
+        'fcmToken': token,
+      });
+    }
+    await _systemCalls.registerVoipToken(uid);
+    messaging.onTokenRefresh.listen((newToken) async {
+      await FirebaseDatabase.instance.ref('users').child(uid).update({
+        'fcmToken': newToken,
+      });
+    });
+  }
+
+  Map<String, dynamic> normalizedCallData(Map<dynamic, dynamic> data) {
+    return _systemCalls.normalizedCallData(data);
+  }
+
+  Future<Map<String, dynamic>?> getActiveAcceptedCall() {
+    return _systemCalls.getActiveAcceptedCall();
+  }
+
+  Future<void> showIncomingCallNotification(Map<dynamic, dynamic> callData) {
+    return _systemCalls.showIncomingCall(callData);
+  }
+
+  Future<void> startOutgoingCallkit(Map<String, dynamic> callData) {
+    return _systemCalls.startOutgoingCall(callData);
+  }
+
+  Future<void> setCallConnected(String callId) {
+    return _systemCalls.setCallConnected(callId);
+  }
+
+  Future<void> endCallkit(String callId) {
+    return _systemCalls.endCall(callId);
+  }
+
+  Future<void> endAllCallkits() {
+    return _systemCalls.endAllCalls();
   }
 
   /// Show a persistent notification for an ongoing call.
@@ -107,8 +216,8 @@ class CallNotificationService {
     );
   }
 
-  /// Show an incoming call notification (Ringing).
-  Future<void> showIncomingCallNotification(String callerName) async {
+  /// Show a simple incoming call notification fallback.
+  Future<void> showIncomingCallBanner(String callerName) async {
     const androidDetails = AndroidNotificationDetails(
       'incoming_call_channel',
       'Incoming Calls',
@@ -137,9 +246,36 @@ class CallNotificationService {
     );
   }
 
+  Future<void> showMessageNotification({
+    required String title,
+    required String body,
+    required String chatId,
+  }) async {
+    const androidDetails = AndroidNotificationDetails(
+      'messages_channel',
+      'Messages',
+      channelDescription: 'Message notifications',
+      importance: Importance.high,
+      priority: Priority.high,
+      category: AndroidNotificationCategory.message,
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentSound: true,
+      presentBadge: true,
+      presentAlert: true,
+    );
+    const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+    await _notifications.show(
+      12,
+      title,
+      body,
+      details,
+      payload: 'chat:$chatId',
+    );
+  }
+
   /// Dismiss the call notification.
   Future<void> dismissCallNotification() async {
     await _notifications.cancel(10);
-    await _notifications.cancel(11);
   }
 }

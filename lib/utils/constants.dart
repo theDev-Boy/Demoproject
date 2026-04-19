@@ -34,6 +34,7 @@ class AppConstants {
   static const String usersPath = 'users';
   static const String activeUsersPath = 'active_users';
   static const String matchesPath = 'matches';
+  static const String directCallsPath = 'direct_calls';
   static const String reportsPath = 'reports';
   static const String bannedUsersPath = 'banned_users';
 }

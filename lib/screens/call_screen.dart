@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:agora_uikit/agora_uikit.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../config/app_colors.dart';
@@ -21,8 +21,6 @@ class CallScreen extends StatefulWidget {
 }
 
 class _CallScreenState extends State<CallScreen> {
-  Offset _localVideoPosition = const Offset(16, 100);
-
   @override
   void initState() {
     super.initState();
@@ -37,21 +35,18 @@ class _CallScreenState extends State<CallScreen> {
   Widget build(BuildContext context) {
     final call = context.watch<CallProvider>();
     final auth = context.read<AuthProvider>();
-    final screenW = MediaQuery.sizeOf(context).width;
-    final screenH = MediaQuery.sizeOf(context).height;
-    final pipW = screenW < 360 ? 100.0 : 120.0;
-    final pipH = screenW < 360 ? 140.0 : 160.0;
 
     return Scaffold(
       backgroundColor: AppColors.callBackground,
       body: Stack(
         children: [
-          // REMOTE VIDEO (full screen) or SEARCHING ANIMATION
-          if (call.state == CallState.connected)
+          if (call.state == CallState.connected && call.agoraClient != null)
             Positioned.fill(
-              child: RTCVideoView(
-                call.remoteRenderer,
-                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+              child: AgoraVideoViewer(
+                client: call.agoraClient!,
+                layoutType: Layout.floating,
+                enableHostControls: false,
+                showAVState: true,
               ),
             )
           else
@@ -59,48 +54,6 @@ class _CallScreenState extends State<CallScreen> {
               child: SearchingAnimation(isConnecting: call.state == CallState.connecting),
             ),
 
-          // LOCAL VIDEO — draggable PiP
-          if (call.state != CallState.idle)
-            Positioned(
-              left: _localVideoPosition.dx.clamp(0, screenW - pipW),
-              top: _localVideoPosition.dy.clamp(0, screenH - pipH - 100),
-              child: GestureDetector(
-                onPanUpdate: (details) {
-                  setState(() {
-                    _localVideoPosition = Offset(
-                      (_localVideoPosition.dx + details.delta.dx).clamp(0, screenW - pipW),
-                      (_localVideoPosition.dy + details.delta.dy).clamp(0, screenH - pipH - 100),
-                    );
-                  });
-                },
-                child: Container(
-                  width: pipW,
-                  height: pipH,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusM),
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusM - 2),
-                    child: RTCVideoView(
-                      call.localRenderer,
-                      mirror: true,
-                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // TOP OVERLAY — partner info (connected state only)
           if (call.state == CallState.connected || call.state == CallState.connecting)
             Positioned(
               top: 0,
@@ -117,7 +70,6 @@ class _CallScreenState extends State<CallScreen> {
                 ),
                 child: Row(
                   children: [
-                    // Minimize button
                     IconButton(
                       icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 32),
                       tooltip: 'Minimize',
@@ -130,7 +82,6 @@ class _CallScreenState extends State<CallScreen> {
                     ),
                     const SizedBox(width: 8),
                     if (call.state == CallState.connected) ...[
-                      // Timer
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -144,7 +95,6 @@ class _CallScreenState extends State<CallScreen> {
                       ),
                       const SizedBox(width: 14),
                     ],
-                    // Partner info
                     Expanded(
                       child: InkWell(
                         onTap: () => _showPartnerProfile(context, call),
@@ -175,7 +125,6 @@ class _CallScreenState extends State<CallScreen> {
                         ),
                       ),
                     ),
-                    // Live dot
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -192,7 +141,6 @@ class _CallScreenState extends State<CallScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Add Friend button
                     if (call.currentMatch != null && !(auth.userModel?.friends.contains(call.currentMatch!.getPartnerUid(auth.userModel!.uid)) ?? false))
                       IconButton(
                         icon: const Icon(Icons.person_add_rounded, color: Colors.white),
@@ -223,7 +171,6 @@ class _CallScreenState extends State<CallScreen> {
                           }
                         },
                       ),
-                    // Report button
                     PopupMenuButton<String>(
                       icon: const Icon(Icons.more_vert, color: Colors.white70),
                       onSelected: (value) async {
@@ -247,7 +194,24 @@ class _CallScreenState extends State<CallScreen> {
               ),
             ),
 
-          // BOTTOM — call controls
+          if (call.state == CallState.connected && call.agoraClient != null)
+            Positioned(
+              bottom: MediaQuery.of(context).padding.bottom + 100,
+              left: 16,
+              right: 16,
+              child: AgoraVideoButtons(
+                client: call.agoraClient!,
+                autoHideButtonTime: 8,
+                verticalButtonPadding: 12,
+                enabledButtons: const [
+                  BuiltInButtons.toggleMic,
+                  BuiltInButtons.switchCamera,
+                  BuiltInButtons.toggleCamera,
+                  BuiltInButtons.callEnd,
+                ],
+              ),
+            ),
+
           Positioned(
             bottom: MediaQuery.of(context).padding.bottom + 24,
             left: 0,
@@ -255,7 +219,6 @@ class _CallScreenState extends State<CallScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Cancel button (searching state only)
                 if (call.state == CallState.searching || call.state == CallState.connecting)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
@@ -269,7 +232,6 @@ class _CallScreenState extends State<CallScreen> {
                     ),
                   ),
 
-                // Call controls bar
                 CallControls(
                   isMicMuted: call.isMicMuted,
                   isCameraOff: call.isCameraOff,
