@@ -2,6 +2,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_callkit_incoming/entities/call_event.dart';
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -142,7 +143,7 @@ class CallNotificationService {
     return 'call:$query';
   }
 
-  Stream get onSystemCallEvent => _systemCalls.onEvent;
+  Stream<CallEvent?> get onSystemCallEvent => _systemCalls.onEvent;
 
   Future<void> registerCurrentUser(String uid) => _registerCurrentUser(uid);
 

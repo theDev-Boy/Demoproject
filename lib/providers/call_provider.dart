@@ -232,7 +232,7 @@ class CallProvider extends ChangeNotifier {
 
     _agoraClient = AgoraClient(
       agoraConnectionData: AgoraConnectionData(
-        appId: "e7f6e9aeecf14b2ba10e3f40be9f56e7",
+        appId: AppConstants.agoraAppId,
         channelName: channelName,
         tempToken: token,
       ),

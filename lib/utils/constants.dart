@@ -4,6 +4,7 @@ class AppConstants {
 
   static const String appName = 'Zuumeet';
   static const String appTagline = 'Connect with people around the world';
+  static const String agoraAppId = '3358afdcb6084bf5ad6df5a7fdc8e92b';
 
   // Splash
   static const int splashDurationMs = 3000;

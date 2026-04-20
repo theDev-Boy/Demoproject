@@ -10,6 +10,7 @@ import '../services/agora_token_service.dart';
 import '../services/call_notification_service.dart';
 import '../services/chat_service.dart';
 import '../services/database_service.dart';
+import '../utils/constants.dart';
 import '../widgets/avatar_widget.dart';
 
 class AudioCallScreen extends StatefulWidget {
@@ -107,7 +108,7 @@ class _AudioCallScreenState extends State<AudioCallScreen>
 
     _agoraClient = AgoraClient(
       agoraConnectionData: AgoraConnectionData(
-        appId: "e7f6e9aeecf14b2ba10e3f40be9f56e7",
+        appId: AppConstants.agoraAppId,
         channelName: widget.channelName,
         tempToken: token,
       ),

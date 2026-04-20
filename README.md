@@ -609,3 +609,114 @@ Analyzing app...
 
 55 issues found. (ran in 291.5s)
 PS C:\flutter_app_website\Hunt-yt\Demoproject\app> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+rescent erorrs: 
+
+Microsoft Windows [Version 10.0.19045.6466]                        
+(c) Microsoft Corporation. All rights reserved.                    
+                                                                   
+C:\flutter_app_website\Hunt-yt\Demoproject\app>flutter analyze
+Analyzing app...                                                        
+
+  error - A value of type 'StreamSubscription<dynamic>' can't be assigned to a
+         variable of type 'StreamSubscription<CallEvent?>?' - lib\app.dart:159:21 -
+         invalid_assignment
+warning - Unused import: 'package:firebase_database/firebase_database.dart' -
+       lib\screens\chat_screen.dart:8:8 - unused_import
+   info - The imported package 'flutter_webrtc' isn't a dependency of the importing
+          package - lib\services\webrtc_service.dart:2:8 -
+          depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:flutter_webrtc/flutter_webrtc.dart' -         lib\services\webrtc_service.dart:2:8 - uri_does_not_exist
+  error - Undefined class 'MediaStream' - lib\services\webrtc_service.dart:8:40 -
+         undefined_class
+  error - Undefined class 'RTCPeerConnectionState' -
+         lib\services\webrtc_service.dart:9:49 - undefined_class
+  error - Undefined class 'RTCIceCandidate' - lib\services\webrtc_service.dart:10:40
+         - undefined_class
+  error - Undefined class 'RTCPeerConnection' - lib\services\webrtc_service.dart:20:3         - undefined_class
+  error - Undefined class 'MediaStream' - lib\services\webrtc_service.dart:21:3 -
+         undefined_class
+  error - Undefined class 'MediaStream' - lib\services\webrtc_service.dart:22:3 -
+         undefined_class
+  error - Undefined class 'MediaStream' - lib\services\webrtc_service.dart:35:3 -
+         undefined_class
+  error - Undefined class 'MediaStream' - lib\services\webrtc_service.dart:36:3 -
+         undefined_class
+  error - The name 'MediaStream' isn't a type, so it can't be used as a type argument         - lib\services\webrtc_service.dart:80:10 - non_type_as_type_argument
+  error - Undefined name 'navigator' - lib\services\webrtc_service.dart:88:17 -
+         undefined_identifier
+  error - The method 'createPeerConnection' isn't defined for the type
+         'WebRTCService' - lib\services\webrtc_service.dart:107:31 - undefined_method  error - Undefined name 'Helper' - lib\services\webrtc_service.dart:110:13 -
+         undefined_identifier
+  error - The method 'RTCRtpTransceiverInit' isn't defined for the type
+         'WebRTCService' - lib\services\webrtc_service.dart:115:35 - undefined_method  error - Undefined name 'TransceiverDirection' -
+         lib\services\webrtc_service.dart:116:24 - undefined_identifier
+  error - Undefined class 'RTCTrackEvent' - lib\services\webrtc_service.dart:127:35 -         undefined_class
+  error - Undefined class 'RTCIceCandidate' - lib\services\webrtc_service.dart:136:42         - undefined_class
+  error - Undefined class 'RTCIceGatheringState' -
+         lib\services\webrtc_service.dart:144:12 - undefined_class
+  error - Undefined class 'RTCIceConnectionState' -
+         lib\services\webrtc_service.dart:150:12 - undefined_class
+  error - Undefined name 'RTCIceConnectionState' -
+         lib\services\webrtc_service.dart:152:22 - undefined_identifier
+  error - Undefined class 'RTCPeerConnectionState' -
+         lib\services\webrtc_service.dart:160:12 - undefined_class
+  error - The name 'RTCSessionDescription' isn't a type, so it can't be used as a
+         type argument - lib\services\webrtc_service.dart:177:10 -
+         non_type_as_type_argument
+  error - The method 'RTCSessionDescription' isn't defined for the type
+         'WebRTCService' - lib\services\webrtc_service.dart:188:26 - undefined_method  error - The name 'RTCSessionDescription' isn't a type, so it can't be used as a
+         type argument - lib\services\webrtc_service.dart:195:10 -
+         non_type_as_type_argument
+  error - The method 'RTCSessionDescription' isn't defined for the type
+         'WebRTCService' - lib\services\webrtc_service.dart:203:27 - undefined_method  error - Undefined class 'RTCSessionDescription' -
+         lib\services\webrtc_service.dart:265:37 - undefined_class
+  error - Undefined class 'RTCIceCandidate' - lib\services\webrtc_service.dart:271:32         - undefined_class
+  error - Undefined name 'Helper' - lib\services\webrtc_service.dart:309:13 -
+         undefined_identifier
+   info - The imported package 'flutter_webrtc' isn't a dependency of the importing
+          package - lib\widgets\video_card.dart:2:8 - depend_on_referenced_packages
+  error - Target of URI doesn't exist: 'package:flutter_webrtc/flutter_webrtc.dart' -         lib\widgets\video_card.dart:2:8 - uri_does_not_exist
+  error - Undefined class 'RTCVideoRenderer' - lib\widgets\video_card.dart:6:9 -
+         undefined_class
+  error - The method 'RTCVideoView' isn't defined for the type 'VideoCard' -
+         lib\widgets\video_card.dart:35:16 - undefined_method
+  error - Undefined name 'RTCVideoViewObjectFit' - lib\widgets\video_card.dart:38:22
+         - undefined_identifier
+
+36 issues found. (ran in 647.3s)
+
+C:\flutter_app_website\Hunt-yt\Demoproject\app>

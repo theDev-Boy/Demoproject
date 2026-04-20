@@ -7,7 +7,6 @@ import '../models/customization_models.dart';
 import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../services/avatar_service.dart';
-import '../services/ad_manager.dart';
 import '../widgets/avatar_widget.dart';
 
 class CustomAvatarScreen extends StatefulWidget {
@@ -42,41 +41,26 @@ class _CustomAvatarScreenState extends State<CustomAvatarScreen> {
     setState(() => _selectedCategory = category);
   }
 
-  void _onSelectAvatar(AvatarModel avatar) async {
+  void _onSelectAvatar(AvatarModel avatar) {
+    setState(() => _tempAvatarUrl = avatar.imageUrl);
     if (avatar.isPremium) {
-      // Trigger Ad to unlock
-      await AdManager.showInterstitial(
-        onComplete: () {
-          setState(() => _tempAvatarUrl = avatar.imageUrl);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Premium Avatar Unlocked!'), backgroundColor: AppColors.success),
-          );
-        },
-        onFailed: (err) {
-           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Watch ad to unlock: $err'), backgroundColor: AppColors.error),
-          );
-        }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Premium Avatar Selected'),
+          backgroundColor: AppColors.success,
+        ),
       );
-    } else {
-      setState(() => _tempAvatarUrl = avatar.imageUrl);
     }
   }
 
-  void _onSelectFrame(FrameModel frame) async {
+  void _onSelectFrame(FrameModel frame) {
     if (frame.isPremium) {
-       await AdManager.showInterstitial(
-        onComplete: () {
-          setState(() => _tempFrameId = frame.id);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Premium Frame Unlocked!'), backgroundColor: AppColors.success),
-          );
-        },
-        onFailed: (err) {
-           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Watch ad to unlock: $err'), backgroundColor: AppColors.error),
-          );
-        }
+      setState(() => _tempFrameId = frame.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Premium Frame Selected'),
+          backgroundColor: AppColors.success,
+        ),
       );
     } else {
       setState(() => _tempFrameId = frame.id);
