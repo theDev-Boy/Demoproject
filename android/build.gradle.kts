@@ -56,7 +56,7 @@ subprojects {
     if (state.executed) {
         fixProject()
     } else {
-        afterEvaluate { fixProject() }
+        beforeEvaluate { fixProject() }
     }
 
     // 4. Force Kotlin JVM Target 17 for all subprojects
