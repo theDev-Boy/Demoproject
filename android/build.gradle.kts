@@ -30,13 +30,13 @@ subprojects {
                     androidObject.defaultConfig.minSdk = 21
                 }
 
-                // 2. Force JVM Target 17 using afterEvaluate to avoid finalization issues
-androidObject.tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
-    sourceCompatibility = JavaVersion.VERSION_17.toString()
-    targetCompatibility = JavaVersion.VERSION_17.toString()
-}
+                                 // 2. Force JVM Target 17 using afterEvaluate to avoid finalization issues
+                 tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
+                     sourceCompatibility = JavaVersion.VERSION_17.toString()
+                     targetCompatibility = JavaVersion.VERSION_17.toString()
+                 }
 
-                // 3. Fix missing namespaces for AGP 8.0+
+             // 3. Fix missing namespaces for AGP 8.0+
                 if (androidObject.namespace == null) {
                     val manifestFile = file("src/main/AndroidManifest.xml")
                     if (manifestFile.exists()) {
