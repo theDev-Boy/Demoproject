@@ -60,7 +60,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper>
 
   void _startRinging() {
     FlutterRingtonePlayer().playRingtone();
-    Vibration.vibrate(pattern: [500, 1000, 500, 1000], repeat: 0);
+    Vibration.vibrate(pattern: [500, 1000, 500, 1000]);
   }
 
   void _stopRinging() {

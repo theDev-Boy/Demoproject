@@ -306,6 +306,9 @@ class DatabaseService {
       'endedAt': ServerValue.timestamp,
     });
     await _db.ref(AppConstants.directCallsPath).child(myUid).remove();
+    if (status == 'missed' || status == 'no_answer' || status == 'declined') {
+      unawaited(_addCallEventToChat(matchId, status));
+    }
   }
 
   Future<void> endDirectCall(String matchId) async {
@@ -322,6 +325,60 @@ class DatabaseService {
         .child(matchId)
         .child('status')
         .onValue;
+  }
+
+  Future<void> _addCallEventToChat(String matchId, String status) async {
+    try {
+      final matchSnap = await _db.ref(AppConstants.matchesPath).child(matchId).get();
+      if (!matchSnap.exists || matchSnap.value == null) return;
+      if (matchSnap.value is! Map) return;
+      final match = Map<dynamic, dynamic>.from(matchSnap.value as Map);
+      final user1 = (match['user1'] ?? '').toString();
+      final user2 = (match['user2'] ?? '').toString();
+      if (user1.isEmpty || user2.isEmpty) return;
+      final users = [user1, user2]..sort();
+      final chatId = users.join('_');
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final callType = (match['callType'] ?? 'call').toString();
+      final text = switch (status) {
+        'missed' || 'no_answer' => 'Missed $callType call',
+        'declined' => '$callType call declined',
+        _ => '$callType call ended',
+      };
+
+      final msgRef = _db.ref('chats').child(chatId).child('messages').push();
+      await msgRef.set({
+        'id': msgRef.key,
+        'senderId': 'system',
+        'text': text,
+        'type': 'callEvent',
+        'timestamp': now,
+        'isEdited': false,
+        'deletedFor': <String>[],
+        'status': 'seen',
+      });
+
+      final metaRef = _db.ref('chats_meta').child(chatId);
+      final metaSnap = await metaRef.get();
+      final metaMap = metaSnap.value is Map
+          ? Map<dynamic, dynamic>.from(metaSnap.value as Map)
+          : <dynamic, dynamic>{};
+      final currentUnread = metaMap['unreadCounts'] is Map
+          ? Map<String, dynamic>.from(metaMap['unreadCounts'] as Map)
+          : <String, dynamic>{};
+      final unreadCounts = <String, int>{
+        user1: (currentUnread[user1] as num?)?.toInt() ?? 0,
+        user2: (currentUnread[user2] as num?)?.toInt() ?? 0,
+      };
+      await metaRef.update({
+        'participants': [user1, user2],
+        'lastMessage': text,
+        'lastMessageTime': now,
+        'unreadCounts': unreadCounts,
+      });
+    } catch (e) {
+      logger.w('Failed to append call event to chat: $e');
+    }
   }
 
   // ---------------------------------------------------------------------------

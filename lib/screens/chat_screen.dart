@@ -35,6 +35,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isTyping = false;
   bool _isRecording = false;
   String? _editingMessageId;
+  MessageModel? _replyToMessage;
 
   // Voice recording
   final Stopwatch _stopwatch = Stopwatch();
@@ -112,11 +113,15 @@ class _ChatScreenState extends State<ChatScreen> {
         text: _msgCtrl.text.trim(),
         type: _isOnlyEmoji(_msgCtrl.text.trim()) ? MessageType.emoji : MessageType.text,
         timestamp: DateTime.now(),
+        replyToMessageId: _replyToMessage?.id,
+        replyToText: _replyToMessage?.text,
+        replyToSenderId: _replyToMessage?.senderId,
       );
       chat.sendMessage(widget.chatId, msg);
     }
 
     _msgCtrl.clear();
+    _replyToMessage = null;
     _updateTyping(false);
 
     // Scroll to bottom
@@ -206,8 +211,12 @@ class _ChatScreenState extends State<ChatScreen> {
         voiceMimeType: 'audio/mp4',
         voiceDurationMs: elapsedMs,
         voiceSizeBytes: bytes.length,
+        replyToMessageId: _replyToMessage?.id,
+        replyToText: _replyToMessage?.text,
+        replyToSenderId: _replyToMessage?.senderId,
       );
       chat.sendMessage(widget.chatId, msg);
+      _replyToMessage = null;
       
       Future.delayed(const Duration(milliseconds: 200), () {
         if (_scrollCtrl.hasClients) {
@@ -521,6 +530,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 }
 
                 final messages = snapshot.data!;
+                unawaited(chatProvider.markDelivered(widget.chatId));
+                unawaited(chatProvider.markSeen(widget.chatId));
 
                 if (messages.isEmpty) {
                   return Center(
@@ -758,6 +769,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   duration,
                   style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87)),
                 ),
+                if (isMe) ...[
+                  const SizedBox(width: 6),
+                  _buildStatusIcon(msg.status, isMe: isMe),
+                ],
               ],
             ),
           ),
@@ -795,6 +810,26 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if ((msg.replyToText ?? '').isNotEmpty && !isEmoji)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isMe
+                              ? Colors.white.withValues(alpha: 0.16)
+                              : AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          msg.replyToText!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isMe ? Colors.white70 : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
                     Text(
                       msg.text,
                       style: TextStyle(
@@ -829,6 +864,10 @@ class _ChatScreenState extends State<ChatScreen> {
                               color: isMe ? Colors.white60 : AppColors.textSecondary,
                             ),
                           ),
+                          if (isMe) ...[
+                            const SizedBox(width: 4),
+                            _buildStatusIcon(msg.status, isMe: isMe),
+                          ],
                         ],
                       ),
                     ],
@@ -873,6 +912,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     },
                   ),
                 ListTile(
+                  leading: const Icon(Icons.reply_rounded, color: AppColors.primary),
+                  title: const Text('Reply'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() => _replyToMessage = msg);
+                  },
+                ),
+                ListTile(
                   leading: const Icon(Icons.delete_outline_rounded, color: Colors.orange),
                   title: const Text('Delete for Me'),
                   onTap: () {
@@ -909,7 +956,36 @@ class _ChatScreenState extends State<ChatScreen> {
           BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -2)),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_replyToMessage != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8, left: 46, right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF242424) : Colors.grey[200],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Replying: ${_replyToMessage!.text}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() => _replyToMessage = null),
+                    child: const Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // Emoji toggle
@@ -985,6 +1061,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
         ],
       ),
+        ],
+      ),
     );
   }
 
@@ -1025,6 +1103,19 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
       return null;
+    }
+  }
+
+  Widget _buildStatusIcon(String status, {required bool isMe}) {
+    final color = isMe ? Colors.white60 : AppColors.textSecondary;
+    switch (status) {
+      case 'seen':
+        return const Icon(Icons.done_all_rounded, size: 14, color: Colors.lightBlueAccent);
+      case 'delivered':
+        return Icon(Icons.done_all_rounded, size: 14, color: color);
+      case 'sent':
+      default:
+        return Icon(Icons.done_rounded, size: 14, color: color);
     }
   }
 }

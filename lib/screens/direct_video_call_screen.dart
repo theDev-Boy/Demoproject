@@ -51,8 +51,11 @@ class _DirectVideoCallScreenState extends State<DirectVideoCallScreen> {
   bool _isConnected = false;
   bool _isMicMuted = false;
   bool _isCameraOff = false;
+  bool _autoAudioFallback = false;
+  bool _weakNetwork = false;
   int _callSeconds = 0;
   String _statusText = 'Connecting...';
+  String _connectionBanner = 'Connecting...';
 
   @override
   void initState() {
@@ -78,7 +81,10 @@ class _DirectVideoCallScreenState extends State<DirectVideoCallScreen> {
       if (status == null) return;
 
       if (status == 'connected' && !_isConnected) {
-        setState(() => _statusText = 'Connecting...');
+        setState(() {
+          _statusText = 'Connecting...';
+          _connectionBanner = 'Connecting...';
+        });
         return;
       }
 
@@ -113,9 +119,41 @@ class _DirectVideoCallScreenState extends State<DirectVideoCallScreen> {
           setState(() {
             _isConnected = true;
             _statusText = _formatDuration(_callSeconds);
+            _connectionBanner = 'Connected';
           });
           _startTimer();
           await CallNotificationService().setCallConnected(widget.callId);
+        },
+        onConnectionStateChanged: (connection, state, reason) {
+          if (!mounted) return;
+          final stateStr = state.toString().toLowerCase();
+          setState(() {
+            if (stateStr.contains('reconnect')) {
+              _connectionBanner = 'Reconnecting...';
+            } else if (stateStr.contains('connect')) {
+              _connectionBanner = _isConnected ? 'Connected' : 'Connecting...';
+            } else if (stateStr.contains('failed')) {
+              _connectionBanner = 'Connection failed';
+            }
+          });
+        },
+        onNetworkQuality: (connection, remoteUid, txQuality, rxQuality) async {
+          if (!mounted) return;
+          final txIdx = txQuality.index;
+          final rxIdx = rxQuality.index;
+          final weak = txIdx >= 4 || rxIdx >= 4;
+          if (weak != _weakNetwork) {
+            setState(() => _weakNetwork = weak);
+          }
+          if (weak && !_autoAudioFallback && !_isCameraOff) {
+            await _agoraClient?.engine.muteLocalVideoStream(true);
+            if (!mounted) return;
+            setState(() {
+              _isCameraOff = true;
+              _autoAudioFallback = true;
+              _connectionBanner = 'Weak network - audio mode';
+            });
+          }
         },
         onUserOffline: (connection, remoteUid, reason) async {
           if (!mounted) return;
@@ -254,6 +292,37 @@ class _DirectVideoCallScreenState extends State<DirectVideoCallScreen> {
             ),
           Positioned(
             top: MediaQuery.of(context).padding.top + 16,
+            left: 16,
+            right: 16,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _weakNetwork
+                            ? Colors.orange.withValues(alpha: 0.6)
+                            : Colors.white12,
+                      ),
+                    ),
+                    child: Text(
+                      _connectionBanner,
+                      style: TextStyle(
+                        color: _weakNetwork ? Colors.orangeAccent : Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 56,
             left: 16,
             right: 16,
             child: Row(

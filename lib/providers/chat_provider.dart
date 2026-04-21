@@ -11,6 +11,7 @@ class ChatProvider extends ChangeNotifier {
   
   List<ChatModel> _chats = [];
   String _myUid = '';
+  final Map<String, bool> _statusUpdateInFlight = {};
   
   List<ChatModel> get chats => _chats;
 
@@ -58,6 +59,40 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> sendMessage(String chatId, MessageModel message) async {
     await _service.sendMessage(chatId, message);
+  }
+
+  Future<void> markDelivered(String chatId) async {
+    await _markIncomingStatus(chatId, targetStatus: 'delivered');
+  }
+
+  Future<void> markSeen(String chatId) async {
+    await _markIncomingStatus(chatId, targetStatus: 'seen');
+    if (_myUid.isNotEmpty) {
+      await FirebaseDatabase.instance
+          .ref('chats_meta')
+          .child(chatId)
+          .child('unreadCounts')
+          .child(_myUid)
+          .set(0);
+    }
+  }
+
+  Future<void> _markIncomingStatus(
+    String chatId, {
+    required String targetStatus,
+  }) async {
+    final key = '$chatId:$targetStatus';
+    if (_statusUpdateInFlight[key] == true || _myUid.isEmpty) return;
+    _statusUpdateInFlight[key] = true;
+    try {
+      await _service.markIncomingMessageStatus(
+        chatId,
+        _myUid,
+        targetStatus: targetStatus,
+      );
+    } finally {
+      _statusUpdateInFlight[key] = false;
+    }
   }
 
   Future<void> setTyping(String chatId, String myUid, bool isTyping) async {

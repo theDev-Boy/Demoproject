@@ -42,6 +42,7 @@ class _AudioCallScreenState extends State<AudioCallScreen>
   bool _isConnected = false;
   bool _isMuted = false;
   bool _isSpeaker = false;
+  bool _weakNetwork = false;
   int _callSeconds = 0;
   Timer? _callTimer;
   Timer? _ringTimer;
@@ -50,6 +51,7 @@ class _AudioCallScreenState extends State<AudioCallScreen>
   final _db = DatabaseService();
   StreamSubscription? _statusSub;
   String _statusText = 'Connecting...';
+  String _connectionBanner = 'Connecting...';
 
   late AnimationController _pulseController;
   late AnimationController _waveController;
@@ -68,6 +70,7 @@ class _AudioCallScreenState extends State<AudioCallScreen>
     )..repeat();
 
     _statusText = widget.isOutgoing ? 'Calling...' : 'Connecting...';
+    _connectionBanner = _statusText;
     _listenForStatusChanges();
     _initAgoraAudio();
   }
@@ -119,9 +122,32 @@ class _AudioCallScreenState extends State<AudioCallScreen>
           setState(() {
             _isConnected = true;
             _statusText = _formatDuration(_callSeconds);
+            _connectionBanner = 'Connected';
           });
           _onCallConnected();
           await CallNotificationService().setCallConnected(widget.callId);
+        },
+        onConnectionStateChanged: (connection, state, reason) {
+          if (!mounted) return;
+          final stateStr = state.toString().toLowerCase();
+          setState(() {
+            if (stateStr.contains('reconnect')) {
+              _connectionBanner = 'Reconnecting...';
+            } else if (stateStr.contains('connect')) {
+              _connectionBanner = _isConnected ? 'Connected' : 'Connecting...';
+            } else if (stateStr.contains('failed')) {
+              _connectionBanner = 'Connection failed';
+            }
+          });
+        },
+        onNetworkQuality: (connection, remoteUid, txQuality, rxQuality) {
+          if (!mounted) return;
+          final txIdx = txQuality.index;
+          final rxIdx = rxQuality.index;
+          final weak = txIdx >= 4 || rxIdx >= 4;
+          if (weak != _weakNetwork) {
+            setState(() => _weakNetwork = weak);
+          }
         },
         onUserOffline: (connection, remoteUid, reason) async {
           if (!mounted) return;
@@ -258,6 +284,29 @@ class _AudioCallScreenState extends State<AudioCallScreen>
                     ? AppColors.success
                     : AppColors.textSecondary,
                 fontWeight: _isConnected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white10 : Colors.black12,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _weakNetwork
+                      ? Colors.orange.withValues(alpha: 0.6)
+                      : Colors.transparent,
+                ),
+              ),
+              child: Text(
+                _weakNetwork ? 'Weak network' : _connectionBanner,
+                style: TextStyle(
+                  color: _weakNetwork
+                      ? Colors.orange
+                      : (isDark ? Colors.white70 : Colors.black54),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
 

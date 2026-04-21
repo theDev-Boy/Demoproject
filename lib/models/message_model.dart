@@ -12,6 +12,10 @@ class MessageModel {
   final String? voiceMimeType;
   final int? voiceDurationMs;
   final int? voiceSizeBytes;
+  final String status;
+  final String? replyToMessageId;
+  final String? replyToText;
+  final String? replyToSenderId;
 
   MessageModel({
     required this.id,
@@ -25,6 +29,10 @@ class MessageModel {
     this.voiceMimeType,
     this.voiceDurationMs,
     this.voiceSizeBytes,
+    this.status = 'sent',
+    this.replyToMessageId,
+    this.replyToText,
+    this.replyToSenderId,
   });
 
   Map<String, dynamic> toMap() {
@@ -40,6 +48,10 @@ class MessageModel {
       'voiceMimeType': voiceMimeType,
       'voiceDurationMs': voiceDurationMs,
       'voiceSizeBytes': voiceSizeBytes,
+      'status': status,
+      'replyToMessageId': replyToMessageId,
+      'replyToText': replyToText,
+      'replyToSenderId': replyToSenderId,
     };
   }
 
@@ -59,6 +71,10 @@ class MessageModel {
       voiceMimeType: map['voiceMimeType'] as String?,
       voiceDurationMs: map['voiceDurationMs'] as int?,
       voiceSizeBytes: map['voiceSizeBytes'] as int?,
+      status: (map['status'] as String?) ?? 'sent',
+      replyToMessageId: map['replyToMessageId'] as String?,
+      replyToText: map['replyToText'] as String?,
+      replyToSenderId: map['replyToSenderId'] as String?,
     );
   }
 }

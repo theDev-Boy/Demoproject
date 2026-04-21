@@ -103,8 +103,24 @@ class _CallScreenState extends State<CallScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              call.state == CallState.connecting ? 'Connecting...' : (call.partnerName ?? 'Partner'),
+                              call.state == CallState.connecting
+                                  ? call.connectionStatus
+                                  : (call.partnerName ?? 'Partner'),
                               style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              call.weakNetwork
+                                  ? 'Weak network'
+                                  : call.connectionStatus,
+                              style: TextStyle(
+                                color: call.weakNetwork
+                                    ? Colors.orangeAccent
+                                    : Colors.white60,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                             if (call.partnerCountry != null && call.partnerCountry!.isNotEmpty)
@@ -140,6 +156,25 @@ class _CallScreenState extends State<CallScreen> {
                         ],
                       ),
                     ),
+                    if (call.autoAudioFallback)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+                          ),
+                          child: const Text(
+                            'Audio Mode',
+                            style: TextStyle(
+                              color: Colors.orangeAccent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
                     const SizedBox(width: 12),
                     if (call.currentMatch != null && !(auth.userModel?.friends.contains(call.currentMatch!.getPartnerUid(auth.userModel!.uid)) ?? false))
                       IconButton(

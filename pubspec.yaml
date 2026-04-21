@@ -20,7 +20,7 @@ dependencies:
   google_sign_in: ^6.2.1
 
   # Agora SDK for video/audio calls
-  agora_uikit: ^1.1.2
+  agora_uikit: ^1.3.10
 
   # Voice Messages
   record: ^5.0.0
@@ -83,3 +83,9 @@ flutter:
   assets:
     - new_logo.png
     - new_icon.png
+
+dependency_overrides:
+  # Fix for agora_uikit 1.3.10 / agora_rtc_engine conflict
+  agora_rtc_engine: 6.3.2
+  # Fix for record_linux interface mismatch - let pub find the best match for record 5.x
+  record: 5.1.0

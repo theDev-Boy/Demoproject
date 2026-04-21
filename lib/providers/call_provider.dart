@@ -30,6 +30,9 @@ class CallProvider extends ChangeNotifier {
   bool _isCameraOff = false;
   bool _isFrontCamera = true;
   bool _videoEnabled = true;
+  bool _weakNetwork = false;
+  bool _autoAudioFallback = false;
+  String _connectionStatus = 'Connecting...';
 
   StreamSubscription? _matchStatusSub;
   StreamSubscription? _searchSub;
@@ -52,6 +55,9 @@ class CallProvider extends ChangeNotifier {
   bool get isCameraOff => _isCameraOff;
   bool get isVideoCall => _videoEnabled;
   AgoraClient? get agoraClient => _agoraClient;
+  bool get weakNetwork => _weakNetwork;
+  bool get autoAudioFallback => _autoAudioFallback;
+  String get connectionStatus => _connectionStatus;
 
   String get callDurationFormatted {
     final m = (_callDurationSeconds ~/ 60).toString().padLeft(2, '0');
@@ -68,6 +74,9 @@ class CallProvider extends ChangeNotifier {
     _state = CallState.searching;
     _error = null;
     _callDurationSeconds = 0;
+    _weakNetwork = false;
+    _autoAudioFallback = false;
+    _connectionStatus = 'Connecting...';
     notifyListeners();
 
     try {
@@ -173,6 +182,7 @@ class CallProvider extends ChangeNotifier {
     String partnerUid,
   ) async {
     _state = CallState.connecting;
+    _connectionStatus = 'Connecting...';
     notifyListeners();
 
     try {
@@ -199,6 +209,7 @@ class CallProvider extends ChangeNotifier {
     String partnerUid,
   ) async {
     _state = CallState.connecting;
+    _connectionStatus = 'Connecting...';
     notifyListeners();
 
     try {
@@ -237,9 +248,40 @@ class CallProvider extends ChangeNotifier {
         tempToken: token,
       ),
       enabledPermission: [Permission.camera, Permission.microphone],
+      agoraEventHandlers: AgoraRtcEventHandlers(
+        onConnectionStateChanged: (connection, state, reason) {
+          final stateStr = state.toString().toLowerCase();
+          if (stateStr.contains('reconnect')) {
+            _connectionStatus = 'Reconnecting...';
+          } else if (stateStr.contains('connect')) {
+            _connectionStatus =
+                _state == CallState.connected ? 'Connected' : 'Connecting...';
+          } else if (stateStr.contains('failed')) {
+            _connectionStatus = 'Connection failed';
+          }
+          notifyListeners();
+        },
+        onNetworkQuality: (connection, remoteUid, txQuality, rxQuality) async {
+          final txIdx = txQuality.index;
+          final rxIdx = rxQuality.index;
+          final weak = txIdx >= 4 || rxIdx >= 4;
+          if (weak != _weakNetwork) {
+            _weakNetwork = weak;
+            notifyListeners();
+          }
+          if (weak && !_autoAudioFallback && !_isCameraOff && _videoEnabled) {
+            await _agoraClient?.engine.muteLocalVideoStream(true);
+            _isCameraOff = true;
+            _autoAudioFallback = true;
+            _connectionStatus = 'Weak network - audio mode';
+            notifyListeners();
+          }
+        },
+      ),
     );
     await _agoraClient!.initialize();
     _state = CallState.connected;
+    _connectionStatus = 'Connected';
     _startCallTimer();
     notifyListeners();
   }
@@ -258,6 +300,9 @@ class CallProvider extends ChangeNotifier {
     _partnerName = null;
     _partnerCountry = null;
     _callDurationSeconds = 0;
+    _weakNetwork = false;
+    _autoAudioFallback = false;
+    _connectionStatus = 'Connecting...';
     
     _state = CallState.ended;
     notifyListeners();
@@ -312,6 +357,9 @@ class CallProvider extends ChangeNotifier {
     _partnerCountry = null;
     _state = CallState.idle;
     _callDurationSeconds = 0;
+    _weakNetwork = false;
+    _autoAudioFallback = false;
+    _connectionStatus = 'Connecting...';
     notifyListeners();
   }
 
@@ -331,6 +379,9 @@ class CallProvider extends ChangeNotifier {
     _partnerName = null;
     _partnerCountry = null;
     _callDurationSeconds = 0;
+    _weakNetwork = false;
+    _autoAudioFallback = false;
+    _connectionStatus = 'Connecting...';
 
     _state = CallState.idle;
     notifyListeners();

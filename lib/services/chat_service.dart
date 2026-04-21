@@ -40,6 +40,35 @@ class ChatService {
     });
   }
 
+  Future<void> markIncomingMessageStatus(
+    String chatId,
+    String myUid, {
+    required String targetStatus,
+  }) async {
+    final messagesRef = _db.child('chats').child(chatId).child('messages');
+    final snapshot = await messagesRef.get();
+    if (!snapshot.exists || snapshot.value == null) return;
+    if (snapshot.value is! Map) return;
+
+    final updates = <String, Object?>{};
+    final data = Map<dynamic, dynamic>.from(snapshot.value as Map);
+    for (final entry in data.entries) {
+      final msgId = entry.key.toString();
+      final map = entry.value is Map
+          ? Map<dynamic, dynamic>.from(entry.value as Map)
+          : <dynamic, dynamic>{};
+      final senderId = (map['senderId'] ?? '').toString();
+      final currentStatus = (map['status'] ?? 'sent').toString();
+      if (senderId.isEmpty || senderId == myUid) continue;
+      if (targetStatus == 'delivered' && currentStatus == 'seen') continue;
+      if (currentStatus == targetStatus) continue;
+      updates['$msgId/status'] = targetStatus;
+    }
+    if (updates.isNotEmpty) {
+      await messagesRef.update(updates);
+    }
+  }
+
   /// Listen for messages in a chat.
   Stream<DatabaseEvent> listenForMessages(String chatId) {
     return _db.child('chats').child(chatId).child('messages').orderByChild('timestamp').onValue;

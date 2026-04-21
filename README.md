@@ -720,3 +720,354 @@ warning - Unused import: 'package:firebase_database/firebase_database.dart' -
 36 issues found. (ran in 647.3s)
 
 C:\flutter_app_website\Hunt-yt\Demoproject\app>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Microsoft Windows [Version 10.0.19045.6466]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Users\hp>cd /d C:\flutter_app_website\Hunt-yt\Demoproject\app
+
+C:\flutter_app_website\Hunt-yt\Demoproject\app>flutter pub outdated
+Showing outdated packages.
+[*] indicates versions that are not the latest available.
+
+Package Name                                    Current    Upgradable  Resolvable  Latest
+
+direct dependencies:
+audioplayers                                    *5.2.1     *5.2.1      6.6.0       6.6.0
+connectivity_plus                               *6.1.5     *6.1.5      7.1.1       7.1.1
+firebase_auth                                   *5.7.0     *5.7.0      6.4.0       6.4.0
+firebase_core                                   *3.15.2    *3.15.2     4.7.0       4.7.0
+firebase_database                               *11.3.10   *11.3.10    12.3.0      12.3.0
+firebase_messaging                              *15.2.10   *15.2.10    16.2.0      16.2.0
+flutter_local_notifications                     *18.0.1    *18.0.1     21.0.0      21.0.0
+geocoding                                       *3.0.0     *3.0.0      4.0.0       4.0.0
+geolocator                                      *13.0.4    *13.0.4     14.0.2      14.0.2
+go_router                                       *14.8.1    *14.8.1     17.2.1      17.2.1
+google_fonts                                    *6.3.3     *6.3.3      8.0.2       8.0.2
+google_sign_in                                  *6.3.0     *6.3.0      7.2.0       7.2.0
+permission_handler                              *11.4.0    *11.4.0     *11.4.0     12.0.1
+record                                          *5.2.1     *5.2.1      6.2.0       6.2.0
+vibration                                       *2.1.0     *2.1.0      3.1.8       3.1.8
+
+dev_dependencies:
+flutter_launcher_icons                          *0.13.1    *0.13.1     0.14.4      0.14.4
+flutter_lints                                   *3.0.2     *3.0.2      *3.0.2      6.0.0
+
+transitive dependencies:
+_flutterfire_internals                          *1.3.59    *1.3.59     1.3.69      1.3.69
+agora_rtc_engine                                *6.5.3     *6.5.3      *6.5.3      6.6.3
+agora_rtm                                       *1.6.3     *1.6.3      *1.6.3      2.2.6
+audioplayers_android                            *4.0.3     *4.0.3      5.2.1       5.2.1
+audioplayers_darwin                             *5.0.2     *5.0.2      6.4.0       6.4.0
+audioplayers_linux                              *3.1.0     *3.1.0      4.2.1       4.2.1
+audioplayers_platform_interface                 *6.1.0     *6.1.0      7.1.1       7.1.1
+audioplayers_web                                *4.1.0     *4.1.0      5.2.0       5.2.0
+audioplayers_windows                            *3.1.0     *3.1.0      4.3.0       4.3.0
+device_info_plus                                *11.5.0    *11.5.0     *12.4.0     13.0.0
+device_info_plus_platform_interface             *7.0.3     *7.0.3      *7.0.3      8.0.0
+firebase_auth_platform_interface                *7.7.3     *7.7.3      8.1.9       8.1.9
+firebase_auth_web                               *5.15.3    *5.15.3     6.1.5       6.1.5
+firebase_core_web                               *2.24.1    *2.24.1     3.6.0       3.6.0
+firebase_database_platform_interface            *0.2.6+10  *0.2.6+10   0.3.1+1     0.3.1+1
+firebase_database_web                           *0.2.6+16  *0.2.6+16   0.2.7+6     0.2.7+6
+firebase_messaging_platform_interface           *4.6.10    *4.6.10     4.7.9       4.7.9
+firebase_messaging_web                          *3.10.10   *3.10.10    4.1.5       4.1.5
+flutter_local_notifications_linux               *5.0.0     *5.0.0      8.0.0       8.0.0
+flutter_local_notifications_platform_interface  *8.0.0     *8.0.0      11.0.0      11.0.0
+flutter_local_notifications_windows             -          -           3.0.0       3.0.0
+geoclue                                         -          -           0.1.1       0.1.1
+geocoding_android                               *3.3.1     *3.3.1      *4.0.1      5.0.1
+geocoding_platform_interface                    *3.2.0     *3.2.0      *3.2.0      5.0.0
+geolocator_android                              *4.6.2     *4.6.2      5.0.2       5.0.2
+geolocator_linux                                -          -           0.2.4       0.2.4
+google_sign_in_android                          *6.2.1     *6.2.1      7.2.10      7.2.10
+google_sign_in_ios                              *5.9.0     *5.9.0      6.3.0       6.3.0
+google_sign_in_platform_interface               *2.5.0     *2.5.0      3.1.0       3.1.0
+google_sign_in_web                              *0.12.4+4  *0.12.4+4   1.1.3       1.1.3
+gsettings                                       -          -           0.2.8       0.2.8
+js                                              *0.6.7     *0.6.7      0.7.2       0.7.2    (discontinued)
+lints                                           *3.0.0     *3.0.0      *3.0.0      6.1.0
+matcher                                         *0.12.18   *0.12.18    *0.12.18    0.12.19
+meta                                            *1.17.0    *1.17.0     *1.17.0     1.18.2
+package_info_plus                               -          -           *9.0.1      10.0.0
+package_info_plus_platform_interface            -          -           *3.2.1      4.0.0
+permission_handler_android                      *12.1.0    *12.1.0     *12.1.0     13.0.1
+record_ios                                      -          -           1.2.0       1.2.0
+record_linux                                    *0.7.2     *0.7.2      1.3.0       1.3.0
+record_macos                                    -          -           1.2.1       1.2.1
+synchronized                                    *3.4.0     3.4.0+1     3.4.0+1     3.4.0+1
+test_api                                        *0.7.9     *0.7.9      *0.7.9      0.7.11
+timezone                                        *0.10.1    *0.10.1     0.11.0      0.11.0
+vector_math                                     *2.2.0     *2.2.0      *2.2.0      2.3.0
+vibration_platform_interface                    *0.0.3     *0.0.3      0.1.2       0.1.2
+vm_service                                      *15.0.2    15.1.0      15.1.0      15.1.0
+win32                                           *5.15.0    *5.15.0     *5.15.0     6.0.1
+win32_registry                                  *2.1.0     *2.1.0      *2.1.0      3.0.3
+
+2 upgradable dependencies are locked (in pubspec.lock) to older versions.
+To update these dependencies, use `flutter pub upgrade`.
+
+42  dependencies are constrained to versions that are older than a resolvable version.
+To update these dependencies, edit pubspec.yaml, or run `flutter pub upgrade --major-versions`.
+
+js
+    Package js has been discontinued. See https://dart.dev/go/package-discontinue
+
+C:\flutter_app_website\Hunt-yt\Demoproject\app>
+
+
+
+i am getting error while analye please fix now : 
+Warning: PowerShell detected that you might be using a screen reader and has disabled PSReadLine for compatibility purposes
+. If you want to re-enable it, run 'Import-Module PSReadLine'.
+
+PS C:\flutter_app_website\Hunt-yt\Demoproject\app> flutter analyze
+
+┌─────────────────────────────────────────────────────────┐
+│ A new version of Flutter is available!                  │
+│                                                         │
+│ To update to the latest version, run "flutter upgrade". │
+└─────────────────────────────────────────────────────────┘
+Resolving dependencies... (1:11.1s)
+Downloading packages... (11.2s)
+  _flutterfire_internals 1.3.59 (1.3.69 available)
+  agora_rtc_engine 6.5.3 (6.6.3 available)
+  agora_rtm 1.6.3 (2.2.6 available)
+  audioplayers 5.2.1 (6.6.0 available)
+  audioplayers_android 4.0.3 (5.2.1 available)
+  audioplayers_darwin 5.0.2 (6.4.0 available)
+  audioplayers_linux 3.1.0 (4.2.1 available)
+  audioplayers_platform_interface 6.1.0 (7.1.1 available)
+  audioplayers_web 4.1.0 (5.2.0 available)
+  audioplayers_windows 3.1.0 (4.3.0 available)
+  connectivity_plus 6.1.5 (7.1.1 available)
+  device_info_plus 11.5.0 (13.0.0 available)
+  device_info_plus_platform_interface 7.0.3 (8.0.0 available)
+  firebase_auth 5.7.0 (6.4.0 available)
+  firebase_auth_platform_interface 7.7.3 (8.1.9 available)
+  firebase_auth_web 5.15.3 (6.1.5 available)
+  firebase_core 3.15.2 (4.7.0 available)
+  firebase_core_web 2.24.1 (3.6.0 available)
+  firebase_database 11.3.10 (12.3.0 available)
+  firebase_database_platform_interface 0.2.6+10 (0.3.1+1 available)
+  firebase_database_web 0.2.6+16 (0.2.7+6 available)
+  firebase_messaging 15.2.10 (16.2.0 available)
+  firebase_messaging_platform_interface 4.6.10 (4.7.9 available)
+  firebase_messaging_web 3.10.10 (4.1.5 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_local_notifications 18.0.1 (21.0.0 available)
+  flutter_local_notifications_linux 5.0.0 (8.0.0 available)
+  flutter_local_notifications_platform_interface 8.0.0 (11.0.0 available)
+  geocoding 3.0.0 (4.0.0 available)
+  geocoding_android 3.3.1 (5.0.1 available)
+  geocoding_platform_interface 3.2.0 (5.0.0 available)
+  geolocator 13.0.4 (14.0.2 available)
+  geolocator_android 4.6.2 (5.0.2 available)
+  go_router 14.8.1 (17.2.1 available)
+  google_fonts 6.3.3 (8.0.2 available)
+  google_sign_in 6.3.0 (7.2.0 available)
+  google_sign_in_android 6.2.1 (7.2.10 available)
+  google_sign_in_ios 5.9.0 (6.3.0 available)
+  google_sign_in_platform_interface 2.5.0 (3.1.0 available)
+  google_sign_in_web 0.12.4+4 (1.1.3 available)
+  js 0.6.7 (0.7.2 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.18 (0.12.19 available)
+  meta 1.17.0 (1.18.2 available)
+  permission_handler 11.4.0 (12.0.1 available)
+  permission_handler_android 12.1.0 (13.0.1 available)
+  record 5.2.1 (6.2.0 available)
+  record_linux 0.7.2 (1.3.0 available)
+  test_api 0.7.9 (0.7.11 available)
+  timezone 0.10.1 (0.11.0 available)
+  vector_math 2.2.0 (2.3.0 available)
+  vibration 2.1.0 (3.1.8 available)
+  vibration_platform_interface 0.0.3 (0.1.2 available)
+  win32_registry 2.1.0 (3.0.3 available)
+These packages are no longer being depended on:
+- dart_webrtc 1.8.1
+- flutter_webrtc 0.12.12+hotfix.1
+- webrtc_interface 1.5.1
+Changed 3 dependencies!
+57 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Analyzing app...                                                       |
+ *  History restored 
+
+Warning: PowerShell detected that you might be using a screen reader an
+d has disabled PSReadLine for compatibility purposes. If you want to re
+-enable it, run 'Import-Module PSReadLine'.
+
+PS C:\flutter_app_website\Hunt-yt\Demoproject\app> 
+ *  History restored 
+
+Warning: PowerShell detected that you might be using a screen reader and has disabled PSReadLine for compatibility purposes. If you want to re-enable it, run 'Import-Module PSReadLine'.
+
+PS C:\flutter_app_website\Hunt-yt\Demoproject\app> flutter analyze
+Analyzing app...                                                        
+
+  error - The method 'toInt' isn't defined for the type 'QualityType' -
+         lib\providers\call_provider.dart:265:55 - undefined_method    
+  error - The method 'toInt' isn't defined for the type 'QualityType' -
+         lib\providers\call_provider.dart:266:46 - undefined_method    
+  error - The method 'toInt' isn't defined for the type 'QualityType' -
+         lib\screens\audio_call_screen.dart:145:55 - undefined_method
+  error - The method 'toInt' isn't defined for the type 'QualityType' -
+         lib\screens\audio_call_screen.dart:146:46 - undefined_method
+  error - The method 'toInt' isn't defined for the type 'QualityType' -
+         lib\screens\direct_video_call_screen.dart:142:55 - undefined_method
+  error - The method 'toInt' isn't defined for the type 'QualityType' -
+         lib\screens\direct_video_call_screen.dart:143:46 - undefined_method
+
+6 issues found. (ran in 454.4s)
+PS C:\flutter_app_website\Hunt-yt\Demoproject\app> 
+
+
+
+
+and also please see thise eorrs also fix this how we can fix this fix now : Run flutter build apk --release
+  
+Running Gradle task 'assembleRelease'...                        
+Checking the license for package NDK (Side by side) 27.0.12077973 in /usr/local/lib/android/sdk/licenses
+License for package NDK (Side by side) 27.0.12077973 accepted.
+Preparing "Install NDK (Side by side) 27.0.12077973 v.27.0.12077973".
+"Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" ready.
+Installing NDK (Side by side) 27.0.12077973 in /usr/local/lib/android/sdk/ndk/27.0.12077973
+"Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" complete.
+"Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" finished.
+Checking the license for package Android SDK Platform 31 in /usr/local/lib/android/sdk/licenses
+License for package Android SDK Platform 31 accepted.
+Preparing "Install Android SDK Platform 31 (revision 1)".
+"Install Android SDK Platform 31 (revision 1)" ready.
+Installing Android SDK Platform 31 in /usr/local/lib/android/sdk/platforms/android-31
+"Install Android SDK Platform 31 (revision 1)" complete.
+"Install Android SDK Platform 31 (revision 1)" finished.
+[=========                              ] 25%                                   
+[=========                              ] 25% Fetch remote repository...        
+[=======================================] 100% Fetch remote repository...       
+Checking the license for package Android SDK Platform 33 in /usr/local/lib/android/sdk/licenses
+License for package Android SDK Platform 33 accepted.
+Preparing "Install Android SDK Platform 33 (revision 3)".
+"Install Android SDK Platform 33 (revision 3)" ready.
+Installing Android SDK Platform 33 in /usr/local/lib/android/sdk/platforms/android-33
+"Install Android SDK Platform 33 (revision 3)" complete.
+"Install Android SDK Platform 33 (revision 3)" finished.
+[=========                              ] 25%                                   
+[=========                              ] 25% Fetch remote repository...        
+[=======================================] 100% Fetch remote repository...       
+Checking the license for package CMake 3.22.1 in /usr/local/lib/android/sdk/licenses
+License for package CMake 3.22.1 accepted.
+Preparing "Install CMake 3.22.1 v.3.22.1".
+"Install CMake 3.22.1 v.3.22.1" ready.
+Installing CMake 3.22.1 in /usr/local/lib/android/sdk/cmake/3.22.1
+"Install CMake 3.22.1 v.3.22.1" complete.
+"Install CMake 3.22.1 v.3.22.1" finished.
+e: file:///home/runner/.pub-cache/hosted/pub.dev/agora_rtm-1.6.3/android/src/main/kotlin/io/agora/agorartm/AgoraRtmPlugin.kt:22:48 Unresolved reference 'Registrar'.
+e: file:///home/runner/.pub-cache/hosted/pub.dev/agora_rtm-1.6.3/android/src/main/kotlin/io/agora/agorartm/AgoraRtmPlugin.kt:25:28 Unresolved reference 'Registrar'.
+e: file:///home/runner/.pub-cache/hosted/pub.dev/agora_rtm-1.6.3/android/src/main/kotlin/io/agora/agorartm/AgoraRtmPlugin.kt:36:37 Unresolved reference 'Registrar'.
+e: file:///home/runner/.pub-cache/hosted/pub.dev/agora_rtm-1.6.3/android/src/main/kotlin/io/agora/agorartm/AgoraRtmPlugin.kt:39:38 Unresolved reference 'context'.
+e: file:///home/runner/.pub-cache/hosted/pub.dev/agora_rtm-1.6.3/android/src/main/kotlin/io/agora/agorartm/AgoraRtmPlugin.kt:39:59 Unresolved reference 'messenger'.
+e: file:///home/runner/.pub-cache/hosted/pub.dev/agora_rtm-1.6.3/android/src/main/kotlin/io/agora/agorartm/AgoraRtmPlugin.kt:186:32 Unresolved reference 'messenger'.
+e: file:///home/runner/.pub-cache/hosted/pub.dev/agora_rtm-1.6.3/android/src/main/kotlin/io/agora/agorartm/AgoraRtmPlugin.kt:259:36 Unresolved reference 'messenger'.
+../../../.pub-cache/hosted/pub.dev/record_linux-0.7.2/lib/record_linux.dart:12:7: Error: The non-abstract class 'RecordLinux' is missing implementations for these members:
+ - RecordMethodChannelPlatformInterface.startStream
+Try to either
+ - provide an implementation,
+ - inherit an implementation from a superclass or mixin,
+ - mark the class as abstract, or
+ - provide a 'noSuchMethod' implementation.
+class RecordLinux extends RecordPlatform {
+      ^^^^^^^^^^^
+../../../.pub-cache/hosted/pub.dev/record_platform_interface-1.5.0/lib/src/record_platform_interface.dart:46:29: Context: 'RecordMethodChannelPlatformInterface.startStream' is defined here.
+  Future<Stream<Uint8List>> startStream(String recorderId, RecordConfig config);
+                            ^^^^^^^^^^^
+../../../.pub-cache/hosted/pub.dev/record_linux-0.7.2/lib/record_linux.dart:36:16: Error: The method 'RecordLinux.hasPermission' has fewer named arguments than those of overridden method 'RecordMethodChannelPlatformInterface.hasPermission'.
+  Future<bool> hasPermission(String recorderId) {
+               ^
+../../../.pub-cache/hosted/pub.dev/record_platform_interface-1.5.0/lib/src/record_platform_interface.dart:74:16: Context: This is the overridden method ('hasPermission').
+  Future<bool> hasPermission(String recorderId, {bool request = true});
+               ^
+../../../.pub-cache/hosted/pub.dev/agora_uikit-1.3.10/lib/controllers/rtc_event_handlers.dart:305:6: Error: No named parameter with the name 'onExtensionError'.
+  }, onExtensionError: (provider, extension, error, message) {
+     ^^^^^^^^^^^^^^^^
+../../../.pub-cache/hosted/pub.dev/agora_rtc_engine-6.5.3/lib/src/agora_rtc_engine.dart:1649:9: Context: Found this candidate, but the arguments don't match.
+  const RtcEngineEventHandler({
+        ^^^^^^^^^^^^^^^^^^^^^
+Target kernel_snapshot_program failed: Exception
+FAILURE: Build completed with 2 failures.
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':agora_rtm:compileReleaseKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+2: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':app:compileFlutterBuildRelease'.
+> Process 'command '/opt/hostedtoolcache/flutter/stable-3.41.7-x64/flutter/bin/flutter'' finished with non-zero exit value 1
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+BUILD FAILED in 4m 38s
+Running Gradle task 'assembleRelease'...                          278.8s
+Gradle task assembleRelease failed with exit code 1
+Error: Process completed with exit code 1.
