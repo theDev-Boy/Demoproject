@@ -25,6 +25,11 @@ subprojects {
         if (hasProperty("android")) {
             val androidObject = extensions.getByName("android")
             if (androidObject is com.android.build.gradle.BaseExtension) {
+                // Force minSdk to 21 to satisfy newer NDK requirements (fixes [CXX1110])
+                if ((androidObject.defaultConfig.minSdk ?: 0) < 21) {
+                    androidObject.defaultConfig.minSdk = 21
+                }
+
                 if (androidObject.namespace == null) {
                     val manifestFile = file("src/main/AndroidManifest.xml")
                     if (manifestFile.exists()) {
