@@ -18,7 +18,7 @@ packages:
     source: hosted
     version: "6.3.2"
   agora_rtm:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       name: agora_rtm
       sha256: "8272667fb3a385919e5e9845a156aedf40e24850fd28241cb60a5997f1a24494"
@@ -673,13 +673,13 @@ packages:
     source: hosted
     version: "0.20.2"
   iris_method_channel:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       name: iris_method_channel
-      sha256: "131d0a40ba646ba8fd4bf76e24d4ebd4aa3174ee39aa5fe8240c3b827979052c"
+      sha256: "114bbe541369add8dd0727858e7df5764f375e3fb88374ad487301733fddb57f"
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.1"
+    version: "2.2.5"
   jni:
     dependency: transitive
     description:
