@@ -30,21 +30,24 @@ subprojects {
                     androidObject.defaultConfig.minSdk = 21
                 }
 
-                                 // 2. Force JVM Target 17 using afterEvaluate to avoid finalization issues
-                 tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
-                     sourceCompatibility = JavaVersion.VERSION_17.toString()
-                     targetCompatibility = JavaVersion.VERSION_17.toString()
-                 }
+                // 2. Force JVM Target 17 using afterEvaluate to avoid finalization issues
+                tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
+                    sourceCompatibility = JavaVersion.VERSION_17.toString()
+                    targetCompatibility = JavaVersion.VERSION_17.toString()
+                }
 
-             // 3. Fix missing namespaces for AGP 8.0+
+                // 3. Fix missing namespaces for AGP 8.0+
+                // Many older plugins like 'agora_uikit' don't have a namespace set
                 if (androidObject.namespace == null) {
                     val manifestFile = file("src/main/AndroidManifest.xml")
                     if (manifestFile.exists()) {
                         val xml = manifestFile.readText()
+                        // Extract package name from AndrodManifest.xml
                         val packageMatch = Regex("package=\"([^\"]*)\"").find(xml)
                         if (packageMatch != null) {
                             androidObject.namespace = packageMatch.groupValues[1]
                         } else {
+                            // Fallback if no package found
                             androidObject.namespace = "generated.namespace.${name.replace(":", ".")}"
                         }
                     }
@@ -53,11 +56,9 @@ subprojects {
         }
     }
 
-    if (state.executed) {
-        fixProject()
-    } else {
-        beforeEvaluate { fixProject() }
-    }
+    // Trigger the fix early and often
+    fixProject()
+    afterEvaluate { fixProject() }
 
     // 4. Force Kotlin JVM Target 17 for all subprojects
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
