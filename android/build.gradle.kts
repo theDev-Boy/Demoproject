@@ -30,10 +30,10 @@ subprojects {
                     androidObject.defaultConfig.minSdk = 21
                 }
 
-                // 2. Force JVM Target 17 using afterEvaluate to avoid finalization issues
+                // 2. Force JVM Target 1.8 (Most compatible with plugins)
                 tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
-                    sourceCompatibility = JavaVersion.VERSION_17.toString()
-                    targetCompatibility = JavaVersion.VERSION_17.toString()
+                    sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+                    targetCompatibility = JavaVersion.VERSION_1_8.toString()
                 }
 
                 // 3. Fix missing namespaces for AGP 8.0+
@@ -60,12 +60,12 @@ subprojects {
     if (state.executed) {
         fixProject()
     } else {
-        afterEvaluate { fixProject() }
+        beforeEvaluate { fixProject() }
     }
 
-    // 4. Force Kotlin JVM Target 17 for all subprojects
+    // 4. Force Kotlin JVM Target 1.8 for all subprojects
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-        kotlinOptions.jvmTarget = "17"
+        kotlinOptions.jvmTarget = "1.8"
     }
 }
 
