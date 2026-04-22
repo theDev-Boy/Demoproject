@@ -21,7 +21,7 @@ subprojects {
 
 // Global fix for AGP 8.0+ / JVM Target / NDK compatibility
 subprojects {
-    afterEvaluate {
+    val fixProject: Project.() -> Unit = {
         if (hasProperty("android")) {
             val androidObject = extensions.getByName("android")
             if (androidObject is com.android.build.gradle.BaseExtension) {
@@ -47,6 +47,12 @@ subprojects {
         tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
             kotlinOptions.jvmTarget = "1.8"
         }
+    }
+
+    if (state.executed) {
+        fixProject()
+    } else {
+        afterEvaluate { fixProject() }
     }
 }
 
