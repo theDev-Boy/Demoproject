@@ -21,7 +21,7 @@ subprojects {
 
 // Global fix for AGP 8.0+ / JVM Target / NDK compatibility
 subprojects {
-    val fixProject: Project.() -> Unit = {
+    afterEvaluate {
         if (hasProperty("android")) {
             val androidObject = extensions.getByName("android")
             if (androidObject is com.android.build.gradle.BaseExtension) {
@@ -31,41 +31,22 @@ subprojects {
                 }
 
                 // 2. Force JVM Target 1.8 (Most compatible with plugins)
-                tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
-                    sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-                    targetCompatibility = JavaVersion.VERSION_1_8.toString()
+                androidObject.compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_1_8
+                    targetCompatibility = JavaVersion.VERSION_1_8
                 }
 
-                // 3. Fix missing namespaces for AGP 8.0+
-                // Many older plugins like 'agora_uikit' don't have a namespace set
+                // 3. NUCLEAR NAMESPACE FIX: Force a namespace if missing
                 if (androidObject.namespace == null) {
-                    val manifestFile = file("src/main/AndroidManifest.xml")
-                    if (manifestFile.exists()) {
-                        val xml = manifestFile.readText()
-                        // Extract package name from AndrodManifest.xml
-                        val packageMatch = Regex("package=\"([^\"]*)\"").find(xml)
-                        if (packageMatch != null) {
-                            androidObject.namespace = packageMatch.groupValues[1]
-                        } else {
-                            // Fallback if no package found
-                            androidObject.namespace = "generated.namespace.${name.replace(":", ".")}"
-                        }
-                    }
+                    androidObject.namespace = "com.fix.namespace.${name.replace("-", ".").replace("_", ".")}"
                 }
             }
         }
-    }
 
-    // Trigger the fix safely at the right time
-    if (state.executed) {
-        fixProject()
-    } else {
-        beforeEvaluate { fixProject() }
-    }
-
-    // 4. Force Kotlin JVM Target 1.8 for all subprojects
-    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-        kotlinOptions.jvmTarget = "1.8"
+        // 4. Force Kotlin JVM Target 1.8 for all subprojects
+        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+            kotlinOptions.jvmTarget = "1.8"
+        }
     }
 }
 
