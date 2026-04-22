@@ -19,40 +19,36 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// Global fix for AGP 8.0+ / JVM Target / NDK compatibility
+// PRO FIX: Use AGP finalizeDsl to safely inject settings before they are locked
 subprojects {
-    val fixProject: Project.() -> Unit = {
-        if (hasProperty("android")) {
-            val androidObject = extensions.getByName("android")
-            if (androidObject is com.android.build.gradle.BaseExtension) {
-                // 1. Force minSdk to 21 for all plugins to satisfy NDK [CXX1110]
-                if ((androidObject.defaultConfig.minSdk ?: 0) < 21) {
-                    androidObject.defaultConfig.minSdk = 21
-                }
-
-                // 2. Force JVM Target 1.8 (Most compatible with plugins)
-                androidObject.compileOptions {
-                    sourceCompatibility = JavaVersion.VERSION_1_8
-                    targetCompatibility = JavaVersion.VERSION_1_8
-                }
-
-                // 3. NUCLEAR NAMESPACE FIX: Force a namespace if missing
-                if (androidObject.namespace == null) {
-                    androidObject.namespace = "com.fix.namespace.${name.replace("-", ".").replace("_", ".")}"
-                }
+    val androidComponents = extensions.findByType<com.android.build.api.variant.AndroidComponentsExtension<*, *, *>>()
+    if (androidComponents != null) {
+        androidComponents.finalizeDsl { dsl ->
+            // 1. Force minSdk 21
+            if ((dsl.defaultConfig.minSdk ?: 0) < 21) {
+                dsl.defaultConfig.minSdk = 21
             }
-        }
 
-        // 4. Force Kotlin JVM Target 1.8 for all subprojects
-        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-            kotlinOptions.jvmTarget = "1.8"
+            // 2. Force Java 1.8 compatibility
+            dsl.compileOptions.sourceCompatibility = JavaVersion.VERSION_1_8
+            dsl.compileOptions.targetCompatibility = JavaVersion.VERSION_1_8
+
+            // 3. Force namespace if missing
+            if (dsl.namespace == null) {
+                dsl.namespace = "com.fix.namespace.${name.replace("-", ".").replace("_", ".")}"
+            }
         }
     }
 
-    if (state.executed) {
-        fixProject()
-    } else {
-        afterEvaluate { fixProject() }
+    // 4. Force Kotlin JVM Target 1.8
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        kotlinOptions.jvmTarget = "1.8"
+    }
+
+    // 5. Fallback for non-component plugins (Ensures Java 1.8 everywhere)
+    tasks.withType<JavaCompile>().configureEach {
+        sourceCompatibility = "1.8"
+        targetCompatibility = "1.8"
     }
 }
 
