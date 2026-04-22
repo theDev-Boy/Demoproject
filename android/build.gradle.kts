@@ -56,9 +56,12 @@ subprojects {
         }
     }
 
-    // Trigger the fix early and often
-    fixProject()
-    afterEvaluate { fixProject() }
+    // Trigger the fix safely at the right time
+    if (state.executed) {
+        fixProject()
+    } else {
+        afterEvaluate { fixProject() }
+    }
 
     // 4. Force Kotlin JVM Target 17 for all subprojects
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
