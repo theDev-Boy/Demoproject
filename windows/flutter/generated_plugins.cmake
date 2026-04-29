@@ -3,16 +3,17 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  agora_rtc_engine
   audioplayers_windows
   connectivity_plus
   emoji_picker_flutter
   firebase_auth
   firebase_core
   geolocator_windows
-  iris_method_channel
   permission_handler_windows
   record_windows
+  tencent_cloud_chat_sdk
+  tencent_rtc_sdk
+  url_launcher_windows
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

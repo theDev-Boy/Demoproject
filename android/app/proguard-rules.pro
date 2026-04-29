@@ -1,0 +1,3 @@
+-keep class im.zego.zegoexpress.** { *; }
+-keep class com.zego.** { *; }
+-keep class **.zego.** { *; }

@@ -4,19 +4,13 @@ class AppConstants {
 
   static const String appName = 'Zuumeet';
   static const String appTagline = 'Connect with people around the world';
-  static const String agoraAppId = '3358afdcb6084bf5ad6df5a7fdc8e92b';
+
+  // Tencent RTC Credentials
+  static const int trtcSdkAppId = 20039211;
+  static const String trtcSecretKey = 'b809fd78516ac3134601ee922be96480ba693421b862d58189f0d6abd05d6fa8';
 
   // Splash
   static const int splashDurationMs = 3000;
-
-  // WebRTC ICE servers are now fetched DYNAMICALLY by IceServerService.
-  // They include:
-  //   • 6x Google/Cloudflare STUN servers (always included)
-  //   • Open Relay Project TURN servers (fetched from openrelay.metered.ca)
-  //     → Works behind symmetric NATs, corporate/university firewalls
-  //     → Ports 80, 443, TCP — universally firewall-safe
-  //   • 24-hour cache + hardcoded fallback if API is unreachable
-  // See: lib/utils/ice_server_service.dart
 
   // Gender options
   static const List<String> genderOptions = ['Male', 'Female', 'Other'];

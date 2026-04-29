@@ -1071,3 +1071,304 @@ BUILD FAILED in 4m 38s
 Running Gradle task 'assembleRelease'...                          278.8s
 Gradle task assembleRelease failed with exit code 1
 Error: Process completed with exit code 1.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+We are getting thse issues and just give me and updtae the all files whihc i u wnna to rdit to fix this and not cuasing others errors and make ferfect and workable and fix now and give me the udtes file's and tell me why we are getting and how do u solved that? okay good luck think alot and then edit the files bcz i try alot by anothers ai but they were not able to solve u is my last hpeee brooo!
+
+
+Errors:    lity purposes. If you want to re-enable it, run 'Import-Module PSReadLine'.
+
+PS C:\flutter_app_website\Hunt-yt\Demoproject\app> flutter analyze
+Analyzing app...
+ 
+
+warning - Unused import: 'package:go_router/go_router.dart' -
+       lib\screens\audio_call_screen.dart:2:8 - unused_import
+  error - The named parameter 'onOnlySelfInRoom' isn't defined -
+         lib\screens\audio_call_screen.dart:41:7 -
+         undefined_named_parameter
+  error - The named parameter 'onOnlySelfInRoom' isn't defined -       
+         lib\screens\call_screen.dart:38:17 - undefined_named_parameterwarning - Unused import: 'package:go_router/go_router.dart' -
+       lib\screens\direct_video_call_screen.dart:2:8 - unused_import   
+  error - The named parameter 'onOnlySelfInRoom' isn't defined -       
+         lib\screens\direct_video_call_screen.dart:41:7 -
+         undefined_named_parameter
+
+5 issues found. (ran in 308.9s)
+PS C:\flutter_app_website\Hunt-yt\Demoproject\app> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Microsoft Windows [Version 10.0.19045.6466]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Users\hp>cd /d C:\flutter_app_website\Hunt-yt\Demoproject\app
+
+C:\flutter_app_website\Hunt-yt\Demoproject\app>flutter analyze
+Analyzing app...
+
+warning - Unused import: 'package:go_router/go_router.dart' - erros-info\lib\screens\audio_call_screen.dart:2:8 -
+       unused_import
+  error - The named parameter 'onOnlySelfInRoom' isn't defined - erros-info\lib\screens\audio_call_screen.dart:41:7 -
+         undefined_named_parameter
+  error - The named parameter 'onOnlySelfInRoom' isn't defined - erros-info\lib\screens\call_screen.dart:38:17 -
+         undefined_named_parameter
+warning - Unused import: 'package:go_router/go_router.dart' - erros-info\lib\screens\direct_video_call_screen.dart:2:8 -
+       unused_import
+  error - The named parameter 'onOnlySelfInRoom' isn't defined -
+         erros-info\lib\screens\direct_video_call_screen.dart:41:7 - undefined_named_parameter
+warning - The asset file 'new_logo.png' doesn't exist - erros-info\pubspec.yaml:85:7 - asset_does_not_exist
+warning - The asset file 'new_icon.png' doesn't exist - erros-info\pubspec.yaml:86:7 - asset_does_not_exist
+  error - Target of URI doesn't exist: '../providers/auth_provider.dart' -
+         fixed-app\lib\screens\audio_call_screen.dart:4:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: '../utils/constants.dart' - fixed-app\lib\screens\audio_call_screen.dart:5:8 -
+         uri_does_not_exist
+  error - The name 'AuthProvider' isn't a type, so it can't be used as a type argument -
+         fixed-app\lib\screens\audio_call_screen.dart:29:31 - non_type_as_type_argument
+  error - Undefined name 'AppConstants' - fixed-app\lib\screens\audio_call_screen.dart:34:14 - undefined_identifier
+  error - Undefined name 'AppConstants' - fixed-app\lib\screens\audio_call_screen.dart:35:16 - undefined_identifier
+  error - The setter 'onOnlySelfInRoom' isn't defined for the type 'ZegoUIKitPrebuiltCallConfig' -
+         fixed-app\lib\screens\audio_call_screen.dart:40:11 - undefined_setter
+  error - Target of URI doesn't exist: '../config/app_colors.dart' - fixed-app\lib\screens\call_screen.dart:5:8 -
+         uri_does_not_exist
+  error - Target of URI doesn't exist: '../providers/auth_provider.dart' - fixed-app\lib\screens\call_screen.dart:6:8 -
+         uri_does_not_exist
+  error - Target of URI doesn't exist: '../providers/call_provider.dart' - fixed-app\lib\screens\call_screen.dart:7:8 -
+         uri_does_not_exist
+  error - Target of URI doesn't exist: '../widgets/searching_animation.dart' -
+         fixed-app\lib\screens\call_screen.dart:8:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: '../utils/constants.dart' - fixed-app\lib\screens\call_screen.dart:9:8 -
+         uri_does_not_exist
+  error - The name 'CallProvider' isn't a type, so it can't be used as a type argument -
+         fixed-app\lib\screens\call_screen.dart:21:32 - non_type_as_type_argument
+  error - The name 'AuthProvider' isn't a type, so it can't be used as a type argument -
+         fixed-app\lib\screens\call_screen.dart:22:31 - non_type_as_type_argument
+  error - Undefined name 'AppColors' - fixed-app\lib\screens\call_screen.dart:25:24 - undefined_identifier
+  error - Undefined name 'CallState' - fixed-app\lib\screens\call_screen.dart:28:29 - undefined_identifier
+  error - Undefined name 'AppConstants' - fixed-app\lib\screens\call_screen.dart:31:24 - undefined_identifier
+  error - Undefined name 'AppConstants' - fixed-app\lib\screens\call_screen.dart:32:26 - undefined_identifier
+  error - The setter 'onOnlySelfInRoom' isn't defined for the type 'ZegoUIKitPrebuiltCallConfig' -
+         fixed-app\lib\screens\call_screen.dart:38:21 - undefined_setter
+  error - The method 'SearchingAnimation' isn't defined for the type '_CallScreenState' -
+         fixed-app\lib\screens\call_screen.dart:45:22 - undefined_method
+  error - Undefined name 'CallState' - fixed-app\lib\screens\call_screen.dart:45:69 - undefined_identifier
+  error - Undefined name 'CallState' - fixed-app\lib\screens\call_screen.dart:48:29 - undefined_identifier
+  error - Undefined name 'CallState' - fixed-app\lib\screens\call_screen.dart:48:66 - undefined_identifier
+  error - Undefined name 'CallState' - fixed-app\lib\screens\call_screen.dart:71:29 - undefined_identifier
+  error - Target of URI doesn't exist: '../providers/auth_provider.dart' -
+         fixed-app\lib\screens\direct_video_call_screen.dart:4:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: '../utils/constants.dart' -
+         fixed-app\lib\screens\direct_video_call_screen.dart:5:8 - uri_does_not_exist
+  error - The name 'AuthProvider' isn't a type, so it can't be used as a type argument -
+         fixed-app\lib\screens\direct_video_call_screen.dart:29:31 - non_type_as_type_argument
+  error - Undefined name 'AppConstants' - fixed-app\lib\screens\direct_video_call_screen.dart:34:14 -
+         undefined_identifier
+  error - Undefined name 'AppConstants' - fixed-app\lib\screens\direct_video_call_screen.dart:35:16 -
+         undefined_identifier
+  error - The setter 'onOnlySelfInRoom' isn't defined for the type 'ZegoUIKitPrebuiltCallConfig' -
+         fixed-app\lib\screens\direct_video_call_screen.dart:40:11 - undefined_setter
+  error - The setter 'onOnlySelfInRoom' isn't defined for the type 'ZegoUIKitPrebuiltCallConfig' -
+         lib\screens\audio_call_screen.dart:40:11 - undefined_setter
+  error - The setter 'onOnlySelfInRoom' isn't defined for the type 'ZegoUIKitPrebuiltCallConfig' -
+         lib\screens\call_screen.dart:38:21 - undefined_setter
+  error - The setter 'onOnlySelfInRoom' isn't defined for the type 'ZegoUIKitPrebuiltCallConfig' -
+         lib\screens\direct_video_call_screen.dart:40:11 - undefined_setter
+
+39 issues found. (ran in 635.8s)
+
+C:\flutter_app_website\Hunt-yt\Demoproject\app>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+switching from The this rtc.. which providing us the video and audio call we are getting isue thats why i wnna to switch from this to the Tecent rtc its the keys use this and make ferct and wokrbale video call random call vice call and else okay : Basic Information
+Edition	
+Call : Trial
+Service status	
+Enabled
+SDKAppID	
+20039211
+Expiration time	
+May 04, 2026 19:25:45 (UTC+05:00)
+Auto-renewable	
+--
+SDKSecretKey	
+b809fd78516ac3134601ee922be96480ba693421b862d58189f0d6abd05d6fa8
