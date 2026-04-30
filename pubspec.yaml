@@ -23,7 +23,7 @@ dependencies:
   tencent_calls_uikit: ^4.0.8
 
   # Voice Messages
-  record: ^5.1.0
+  record: ^5.2.0
   audioplayers: ^5.2.1
   path_provider: ^2.1.3
 
