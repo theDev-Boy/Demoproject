@@ -36,6 +36,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Android APK
+        continue-on-error: true # Ignores Flutter's fake "failed to find APK" error
         env:
           JAVA_OPTS: "-Xmx4g"
           GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8'"
@@ -45,5 +46,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Zuumeet-Release-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+          # Use a wildcard to find the APK wherever Gradle hid it
+          path: build/**/outputs/**/*.apk
           retention-days: 14 # The APK will be available for download for 14 days

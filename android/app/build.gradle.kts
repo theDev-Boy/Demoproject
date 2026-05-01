@@ -39,14 +39,6 @@ android {
             )
         }
     }
-
-    // Add this block to fix the "failed to produce an .apk file" error
-    applicationVariants.all {
-        outputs.all {
-            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
-            output.outputFileName = "app-release.apk"
-        }
-    }
 }
 
 flutter {
