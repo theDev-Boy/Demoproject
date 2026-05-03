@@ -86,4 +86,5 @@ flutter:
 
 dependency_overrides:
   record: 5.1.0
+  record_platform_interface: 1.4.0
   
