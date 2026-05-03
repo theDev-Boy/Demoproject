@@ -196,6 +196,15 @@ class DatabaseService {
     }
   }
 
+  /// Update match fields.
+  Future<void> updateMatch(String matchId, Map<String, dynamic> data) async {
+    try {
+      await _db.ref(AppConstants.matchesPath).child(matchId).update(data);
+    } catch (e) {
+      logger.e('Failed to update match', error: e);
+    }
+  }
+
   /// End a match.
   Future<void> endMatch(String matchId) async {
     try {

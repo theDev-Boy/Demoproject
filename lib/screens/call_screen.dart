@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../config/app_colors.dart';
 import '../providers/auth_provider.dart';
 import '../providers/call_provider.dart';
-import '../services/trtc_service.dart';
 import '../widgets/searching_animation.dart';
 
 class CallScreen extends StatefulWidget {
@@ -15,54 +15,87 @@ class CallScreen extends StatefulWidget {
 }
 
 class _CallScreenState extends State<CallScreen> {
-  bool _callStarted = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _maybeStartCall();
-  }
-
-  Future<void> _maybeStartCall() async {
-    final call = context.read<CallProvider>();
-    final auth = context.read<AuthProvider>();
-
-    if (call.state == CallState.connected &&
-        call.currentMatch != null &&
-        !_callStarted &&
-        auth.userModel != null) {
-      _callStarted = true;
-      final partnerId = call.currentMatch!.getPartnerUid(auth.userModel!.uid);
-      // TUICallKit auto-launches its own fullscreen call UI
-      await TRTCService.startVideoCall(partnerId);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final call = context.watch<CallProvider>();
     final auth = context.read<AuthProvider>();
 
-    // Reset flag when call ends so next match can start
-    if (call.state == CallState.idle || call.state == CallState.searching) {
-      _callStarted = false;
-    }
+    final isConnected = call.state == CallState.connected;
 
     return Scaffold(
-      backgroundColor: AppColors.callBackground,
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Searching / connecting animation
-          Positioned.fill(
-            child: SearchingAnimation(
-              isConnecting: call.state == CallState.connecting ||
-                  call.state == CallState.connected,
+          // 1. Remote Video (Full Screen)
+          if (isConnected)
+            Positioned.fill(
+              child: RTCVideoView(
+                call.remoteRenderer,
+                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+              ),
             ),
-          ),
 
-          // Cancel button during search
-          if (call.state == CallState.searching ||
-              call.state == CallState.connecting)
+          // 2. Local Video (Picture-in-Picture)
+          if (isConnected)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 20,
+              right: 20,
+              width: 100,
+              height: 150,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: RTCVideoView(
+                  call.localRenderer,
+                  mirror: true,
+                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                ),
+              ),
+            ),
+
+          // 3. Searching Animation
+          if (!isConnected)
+            Positioned.fill(
+              child: SearchingAnimation(
+                isConnecting: call.state == CallState.connecting,
+              ),
+            ),
+
+          // 4. In-Call Controls (Bottom)
+          if (isConnected)
+            Positioned(
+              bottom: 40,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildControlButton(
+                    icon: call.isMicMuted ? Icons.mic_off : Icons.mic,
+                    color: call.isMicMuted ? Colors.red : Colors.white24,
+                    onTap: call.toggleMic,
+                  ),
+                  _buildControlButton(
+                    icon: Icons.call_end,
+                    color: Colors.red,
+                    size: 64,
+                    onTap: () async {
+                      await call.stopCompletely(auth.firebaseUser!.uid);
+                      if (context.mounted) context.go('/home');
+                    },
+                  ),
+                  _buildControlButton(
+                    icon: Icons.skip_next,
+                    color: AppColors.primary,
+                    onTap: () async {
+                      await call.nextPartner(auth.userModel!);
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+          // 5. Cancel Button (During Search)
+          if (!isConnected)
             Positioned(
               bottom: MediaQuery.of(context).padding.bottom + 24,
               left: 0,
@@ -81,29 +114,27 @@ class _CallScreenState extends State<CallScreen> {
                 ),
               ),
             ),
-
-          // Next button while connected (TRTC UI is on top)
-          if (call.state == CallState.connected)
-            Positioned(
-              bottom: MediaQuery.of(context).padding.bottom + 24,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.2),
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () async {
-                    _callStarted = false;
-                    await call.nextPartner(auth.userModel!);
-                  },
-                  icon: const Icon(Icons.skip_next),
-                  label: const Text('Next'),
-                ),
-              ),
-            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildControlButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    double size = 56,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: size * 0.5),
       ),
     );
   }

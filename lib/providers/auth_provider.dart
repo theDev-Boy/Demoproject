@@ -5,7 +5,6 @@ import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/call_notification_service.dart';
 import '../services/database_service.dart';
-import '../services/trtc_service.dart';
 import '../utils/logger.dart';
 
 /// Manages authentication state across the app.
@@ -44,11 +43,6 @@ class AuthProvider extends ChangeNotifier {
         _databaseService.setupPresence(user.uid);
         await _databaseService.setOnlineStatus(user.uid, true);
         await CallNotificationService().registerCurrentUser(user.uid);
-        
-        // Init Tencent RTC
-        if (_userModel != null) {
-          await TRTCService.init(user.uid, _userModel!.name);
-        }
       } else {
         _userModel = null;
       }
@@ -294,7 +288,6 @@ class AuthProvider extends ChangeNotifier {
     if (_firebaseUser != null) {
       await _databaseService.setOnlineStatus(_firebaseUser!.uid, false);
       await _databaseService.leaveSearchQueue(_firebaseUser!.uid);
-      await TRTCService.uninit();
     }
     await _authService.signOut();
     _firebaseUser = null;

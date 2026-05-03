@@ -5,9 +5,14 @@ class AppConstants {
   static const String appName = 'Zuumeet';
   static const String appTagline = 'Connect with people around the world';
 
-  // Tencent RTC Credentials
-  static const int trtcSdkAppId = 20039211;
-  static const String trtcSecretKey = 'b809fd78516ac3134601ee922be96480ba693421b862d58189f0d6abd05d6fa8';
+  // WebRTC Configuration
+  static const Map<String, dynamic> iceServers = {
+    'iceServers': [
+      {'urls': 'stun:stun.l.google.com:19302'},
+      {'urls': 'stun:stun1.l.google.com:19302'},
+      {'urls': 'stun:stun2.l.google.com:19302'},
+    ]
+  };
 
   // Splash
   static const int splashDurationMs = 3000;

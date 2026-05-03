@@ -1,25 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import '../services/trtc_service.dart';
+import '../providers/call_provider.dart';
+import '../providers/auth_provider.dart';
 
 class AudioCallScreen extends StatefulWidget {
-  final String callId;
-  final String matchId;
-  final String channelName;
   final String partnerUid;
   final String partnerName;
-  final String partnerAvatar;
   final bool isOutgoing;
+  final String? roomId;
 
   const AudioCallScreen({
     super.key,
-    required this.callId,
-    required this.matchId,
-    required this.channelName,
     required this.partnerUid,
     required this.partnerName,
-    this.partnerAvatar = '',
     this.isOutgoing = true,
+    this.roomId,
   });
 
   @override
@@ -27,42 +23,107 @@ class AudioCallScreen extends StatefulWidget {
 }
 
 class _AudioCallScreenState extends State<AudioCallScreen> {
+  bool _initialized = false;
+
   @override
-  void initState() {
-    super.initState();
-    // TUICallKit auto-launches its own fullscreen call UI on top
-    if (widget.isOutgoing) {
-      TRTCService.startAudioCall(widget.partnerUid);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final call = context.read<CallProvider>();
+      final auth = context.read<AuthProvider>();
+
+      if (widget.isOutgoing) {
+        call.startDirectCall(auth.firebaseUser!.uid, widget.partnerUid, isVideo: false);
+      } else if (widget.roomId != null) {
+        call.answerDirectCall(widget.roomId!, isVideo: false);
+      }
+      _initialized = true;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // TRTC handles the call UI natively — this screen just acts as a launcher
+    final call = context.watch<CallProvider>();
+    final auth = context.read<AuthProvider>();
+    final isConnected = call.state == CallState.connected;
+
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
+      backgroundColor: const Color(0xFF1A1A1A),
+      body: SafeArea(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(color: Colors.white),
-            const SizedBox(height: 20),
+            const Spacer(),
+            // Avatar
+            const CircleAvatar(
+              radius: 60,
+              backgroundColor: Colors.white12,
+              child: Icon(Icons.person, size: 80, color: Colors.white24),
+            ),
+            const SizedBox(height: 24),
             Text(
-              widget.isOutgoing
-                  ? 'Calling ${widget.partnerName}...'
-                  : 'Incoming call from ${widget.partnerName}',
-              style: const TextStyle(color: Colors.white, fontSize: 18),
+              widget.partnerName,
+              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 40),
-            TextButton.icon(
-              onPressed: () {
-                if (context.mounted) context.go('/home');
-              },
-              icon: const Icon(Icons.call_end, color: Colors.red),
-              label: const Text('Back to Home', style: TextStyle(color: Colors.red)),
+            const SizedBox(height: 12),
+            Text(
+              isConnected ? call.callDurationFormatted : (widget.isOutgoing ? 'Calling...' : 'Connecting...'),
+              style: const TextStyle(color: Colors.white70, fontSize: 18),
             ),
+            const Spacer(),
+            // Controls
+            Padding(
+              padding: const EdgeInsets.only(bottom: 60),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildActionBtn(
+                    icon: call.isMicMuted ? Icons.mic_off : Icons.mic,
+                    color: call.isMicMuted ? Colors.red : Colors.white12,
+                    onTap: call.toggleMic,
+                  ),
+                  _buildActionBtn(
+                    icon: Icons.call_end,
+                    color: Colors.red,
+                    size: 72,
+                    onTap: () async {
+                      await call.endCall(auth.firebaseUser!.uid);
+                      if (context.mounted) context.pop();
+                    },
+                  ),
+                  _buildActionBtn(
+                    icon: Icons.volume_up,
+                    color: Colors.white12,
+                    onTap: () {
+                      // Handled by device hardware typically, but can toggle speaker
+                    },
+                  ),
+                ],
+              ),
+            ),
+            if (call.error != null)
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(call.error!, style: const TextStyle(color: Colors.redAccent)),
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionBtn({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    double size = 56,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        child: Icon(icon, color: Colors.white, size: size * 0.5),
       ),
     );
   }

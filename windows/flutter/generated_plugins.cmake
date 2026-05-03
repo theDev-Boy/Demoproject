@@ -4,16 +4,15 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
+  cloud_firestore
   connectivity_plus
   emoji_picker_flutter
   firebase_auth
   firebase_core
+  flutter_webrtc
   geolocator_windows
   permission_handler_windows
   record_windows
-  tencent_cloud_chat_sdk
-  tencent_rtc_sdk
-  url_launcher_windows
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

@@ -1,2 +1,2 @@
-// REMOVED - This file has been deleted.
-// Tencent RTC (TRTC) is now used. See: lib/services/trtc_service.dart
+// DELETED - ZegoCloud is no longer used in this project.
+// Switched to pure WebRTC for better performance and reliability.

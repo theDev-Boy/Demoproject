@@ -72,12 +72,9 @@ class AppRouter {
           builder: (context, state) {
             final extra = state.extra as Map<String, dynamic>;
             return AudioCallScreen(
-              callId: extra['callId'] as String,
-              matchId: extra['matchId'] as String,
-              channelName: extra['channelName'] as String,
               partnerUid: extra['partnerUid'] as String,
               partnerName: extra['partnerName'] as String,
-              partnerAvatar: extra['partnerAvatar'] as String? ?? '',
+              roomId: extra['roomId'] as String?,
               isOutgoing: extra['isOutgoing'] as bool? ?? true,
             );
           },
@@ -88,12 +85,9 @@ class AppRouter {
           builder: (context, state) {
             final extra = state.extra as Map<String, dynamic>;
             return DirectVideoCallScreen(
-              callId: extra['callId'] as String,
-              matchId: extra['matchId'] as String,
-              channelName: extra['channelName'] as String,
               partnerUid: extra['partnerUid'] as String,
               partnerName: extra['partnerName'] as String,
-              partnerAvatar: extra['partnerAvatar'] as String? ?? '',
+              roomId: extra['roomId'] as String?,
               isOutgoing: extra['isOutgoing'] as bool? ?? true,
             );
           },

@@ -1,18 +1,22 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../models/match_model.dart';
 import '../models/user_model.dart';
 import '../services/call_notification_service.dart';
 import '../services/database_service.dart';
+import '../services/webrtc_service.dart';
 import '../utils/constants.dart';
 
-/// States of a video call.
 enum CallState { idle, searching, connecting, connected, ended, error }
 
-/// Manages the entire video call lifecycle using Tencent RTC (TRTC).
 class CallProvider extends ChangeNotifier {
   final DatabaseService _db = DatabaseService();
+  final WebRTCService _webRTCService = WebRTCService();
+
+  final RTCVideoRenderer localRenderer = RTCVideoRenderer();
+  final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
 
   CallState _state = CallState.idle;
   MatchModel? _currentMatch;
@@ -37,7 +41,6 @@ class CallProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Getters
   CallState get state => _state;
   MatchModel? get currentMatch => _currentMatch;
   String? get partnerName => _partnerName;
@@ -55,6 +58,30 @@ class CallProvider extends ChangeNotifier {
     return '$m:$s';
   }
 
+  CallProvider() {
+    _initRenderers();
+  }
+
+  Future<void> _initRenderers() async {
+    await localRenderer.initialize();
+    await remoteRenderer.initialize();
+    
+    _webRTCService.onAddRemoteStream = (stream) {
+      remoteRenderer.srcObject = stream;
+      notifyListeners();
+    };
+    
+    _webRTCService.onCallStateChange = (state) {
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        _connectionStatus = 'Connected';
+        notifyListeners();
+      } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
+                 state == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
+        _onPartnerEndedCall();
+      }
+    };
+  }
+
   Future<void> startSearching(UserModel currentUser, {bool videoEnabled = true}) async {
     if (_state != CallState.idle && _state != CallState.ended) return;
     _videoEnabled = videoEnabled;
@@ -63,6 +90,8 @@ class CallProvider extends ChangeNotifier {
     _error = null;
     _callDurationSeconds = 0;
     _connectionStatus = 'Searching...';
+    
+    await _webRTCService.initLocalStream(localRenderer, isVideo: videoEnabled);
     notifyListeners();
 
     try {
@@ -97,11 +126,7 @@ class CallProvider extends ChangeNotifier {
                   _partnerCountry = partnerData['country'] as String? ?? '';
                   _currentMatch = await _db.getMatch(matchId);
 
-                  await _startCallAsInitiatorTRTC(
-                    matchId,
-                    currentUser.uid,
-                    partnerUid,
-                  );
+                  await _startCallAsInitiator(matchId, currentUser.uid, partnerUid);
                   break;
                 }
               }
@@ -114,8 +139,9 @@ class CallProvider extends ChangeNotifier {
         final status = data['status'] as String? ?? '';
         if (status == 'matched' && (_state == CallState.searching || _state == CallState.ended)) {
           final matchId = data['matchId'] as String?;
-          if (matchId != null) {
-            _onMatchedByPartner(matchId, currentUser);
+          final roomId = data['roomId'] as String?;
+          if (matchId != null && roomId != null) {
+            _onMatchedByPartner(matchId, roomId, currentUser);
           }
         }
       });
@@ -126,7 +152,67 @@ class CallProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _onMatchedByPartner(String matchId, UserModel currentUser) async {
+  Future<void> startDirectCall(String myUid, String partnerUid, {bool isVideo = true}) async {
+    _videoEnabled = isVideo;
+    _state = CallState.connecting;
+    _connectionStatus = 'Calling...';
+    notifyListeners();
+
+    try {
+      await _webRTCService.initLocalStream(localRenderer, isVideo: _videoEnabled);
+      final roomId = await _webRTCService.createRoom(myUid, partnerUid, isVideo: _videoEnabled);
+      debugPrint('WebRTC Room Created: $roomId');
+      // RoomId would typically be sent to the partner via FCM or CallNotificationService here
+      _state = CallState.connected;
+      _startCallTimer();
+      notifyListeners();
+    } catch (e) {
+      _error = 'Direct call failed.';
+      _state = CallState.error;
+      notifyListeners();
+    }
+  }
+
+  Future<void> answerDirectCall(String roomId, {bool isVideo = true}) async {
+    _videoEnabled = isVideo;
+    _state = CallState.connecting;
+    _connectionStatus = 'Connecting...';
+    notifyListeners();
+
+    try {
+      await _webRTCService.initLocalStream(localRenderer, isVideo: _videoEnabled);
+      await _webRTCService.joinRoom(roomId);
+      _state = CallState.connected;
+      _startCallTimer();
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to answer call.';
+      _state = CallState.error;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _startCallAsInitiator(String matchId, String myUid, String partnerUid) async {
+    _state = CallState.connecting;
+    _connectionStatus = 'Connecting...';
+    notifyListeners();
+
+    try {
+      final roomId = await _webRTCService.createRoom(myUid, partnerUid, isVideo: _videoEnabled);
+      await _db.updateMatch(matchId, {'roomId': roomId});
+      
+      _state = CallState.connected;
+      _startCallTimer();
+      _listenForMatchEnd(matchId);
+      notifyListeners();
+    } catch (e) {
+      _error = 'Connection failed.';
+      _state = CallState.error;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _onMatchedByPartner(String matchId, String roomId, UserModel currentUser) async {
     if (_state != CallState.searching && _state != CallState.ended) return;
 
     try {
@@ -136,49 +222,18 @@ class CallProvider extends ChangeNotifier {
       _partnerName = _currentMatch!.getPartnerName(currentUser.uid) ?? 'Partner';
       _searchSub?.cancel();
 
-      await _startCallAsReceiverTRTC(
-        matchId,
-        currentUser.uid,
-        _currentMatch!.getPartnerUid(currentUser.uid),
-      );
+      _state = CallState.connecting;
+      _connectionStatus = 'Connecting...';
+      notifyListeners();
+
+      await _webRTCService.joinRoom(roomId);
+
+      _state = CallState.connected;
+      _startCallTimer();
+      _listenForMatchEnd(matchId);
+      notifyListeners();
     } catch (e) {
       _error = 'Failed to accept call.';
-      _state = CallState.error;
-      notifyListeners();
-    }
-  }
-
-  Future<void> _startCallAsInitiatorTRTC(String matchId, String myUid, String partnerUid) async {
-    _state = CallState.connecting;
-    _connectionStatus = 'Connecting...';
-    notifyListeners();
-
-    try {
-      _state = CallState.connected;
-      _connectionStatus = 'Connected';
-      _startCallTimer();
-      _listenForMatchEnd(matchId);
-      notifyListeners();
-    } catch (e) {
-      _error = 'Connection failed.';
-      _state = CallState.error;
-      notifyListeners();
-    }
-  }
-
-  Future<void> _startCallAsReceiverTRTC(String matchId, String myUid, String partnerUid) async {
-    _state = CallState.connecting;
-    _connectionStatus = 'Connecting...';
-    notifyListeners();
-
-    try {
-      _state = CallState.connected;
-      _connectionStatus = 'Connected';
-      _startCallTimer();
-      _listenForMatchEnd(matchId);
-      notifyListeners();
-    } catch (e) {
-      _error = 'Connection failed.';
       _state = CallState.error;
       notifyListeners();
     }
@@ -197,6 +252,7 @@ class CallProvider extends ChangeNotifier {
   void _onPartnerEndedCall() async {
     _stopCallTimer();
     _cancelSubscriptions();
+    await _webRTCService.hangUp(localRenderer);
     CallNotificationService().dismissCallNotification();
 
     _currentMatch = null;
@@ -222,6 +278,7 @@ class CallProvider extends ChangeNotifier {
       await _db.endMatch(_currentMatch!.matchId);
     }
     await _db.leaveSearchQueue(myUid);
+    await _webRTCService.hangUp(localRenderer);
     CallNotificationService().dismissCallNotification();
 
     _currentMatch = null;
@@ -238,15 +295,18 @@ class CallProvider extends ChangeNotifier {
 
   void toggleMic() {
     _isMicMuted = !_isMicMuted;
+    _webRTCService.toggleMicrophone(_isMicMuted);
     notifyListeners();
   }
 
   void toggleCamera() {
     _isCameraOff = !_isCameraOff;
+    _webRTCService.toggleCamera(_isCameraOff);
     notifyListeners();
   }
 
   void switchCamera() {
+    _webRTCService.switchCamera();
     notifyListeners();
   }
 
@@ -278,6 +338,8 @@ class CallProvider extends ChangeNotifier {
   void dispose() {
     _stopCallTimer();
     _cancelSubscriptions();
+    localRenderer.dispose();
+    remoteRenderer.dispose();
     super.dispose();
   }
 }
